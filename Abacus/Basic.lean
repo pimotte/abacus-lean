@@ -91,7 +91,7 @@ def lim_seq (a : Number → Number) :=
 theorem unique_convergence_seq {a : Number → Number} {p₁ p₂ : Number} (hp₁ : convergence_seq a p₁)
   (hp₂ : convergence_seq a p₂) : p₁ = p₂ := by
   by_contra
-  -- work, also because of ∞ and -∞
+  -- lot of work, also because of ∞ and -∞
   -- maybe link to results from MathLib? Filter.Tendsto g b (nhds a))
   #check Topology.Hausdorff.tendsto_nhds_unique
   sorry
