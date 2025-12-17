@@ -55,16 +55,16 @@ class ToFilter (α' α : Type*) where
   toFilter : α' → Filter α
 
 class LimitOutput (β : Type*) where
-  param : Type*
-  toFilter : param → Filter β
+  points : Type*
+  toFilter : points → Filter β
 
 
 def myTendsto {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
-  (f : α → β) (x₀ : α') (y₀ : LimitOutput.param β) : Prop :=
+  (f : α → β) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
     Filter.Tendsto f (ToFilter.toFilter x₀) (LimitOutput.toFilter y₀)
 
 def myLim {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
-  (f : α → β) (x₀ : α') : MaybeUndefined (LimitOutput.param β) :=
+  (f : α → β) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
   MaybeUndefined.mk (myTendsto f x₀)
 
 /- Instances for functions in the Reals, or Real-valued functions -/
@@ -75,7 +75,7 @@ instance ereal_to_filter_real : ToFilter EReal Real where
     | some (some x') => nhds x'
 
 instance (priority := high) : LimitOutput Real where
-  param := EReal
+  points := EReal
   toFilter := ereal_to_filter_real.toFilter
 
 /- Instances for metric spaces in general -/
@@ -95,7 +95,7 @@ instance {X : Type*} [MetricSpace X] : LimitOutput X := ⟨X, nhds⟩
 #check_failure myLim (fun x : Real => 1/x) (0 : Nat)
 
 #check myLim (fun x : Real => 1/x) (⊤ : EReal) = MaybeUndefined.of_defined (Real.toEReal 0)
-#check myLim (fun x : Real => 1/x) (2 : Real)  = MaybeUndefined.of_defined (Real.toEReal 0.5)
+#check myLim (fun x : Real => 1/x) (2 : Real)  = (Real.toEReal 0.5)
 
 
 /- Test for functions to and from generic metric spaces -/
