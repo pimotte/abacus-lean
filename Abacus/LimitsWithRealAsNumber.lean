@@ -51,49 +51,62 @@ end MaybeUndefined
 notation "Number" => Real
 
 
+class ToFilter (α' α : Type*) where
+  toFilter : α' → Filter α
 
-class LimSpecsOut (β : Type*) where
+class LimitOutput (β : Type*) where
   param : Type*
   toFilter : param → Filter β
 
-class LimSpecsIn (α α' : Type*) where
-  toFilter : α' → Filter α
 
+def myTendsto {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+  (f : α → β) (x₀ : α') (y₀ : LimitOutput.param β) : Prop :=
+    Filter.Tendsto f (ToFilter.toFilter x₀) (LimitOutput.toFilter y₀)
 
-def myTendsto {α α' β : Type*} [LimSpecsIn α α'] [LimSpecsOut β]
-  (f : α → β) (x₀ : α') (y₀ : LimSpecsOut.param β) : Prop :=
-    Filter.Tendsto f (LimSpecsIn.toFilter x₀) (LimSpecsOut.toFilter y₀)
-
-def myLim {α α' β : Type*} [LimSpecsIn α α'] [LimSpecsOut β]
-  (f : α → β) (x₀ : α') :=
+def myLim {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+  (f : α → β) (x₀ : α') : MaybeUndefined (LimitOutput.param β) :=
   MaybeUndefined.mk (myTendsto f x₀)
 
+/- Instances for functions in the Reals, or Real-valued functions -/
+instance ereal_to_filter_real : ToFilter EReal Real where
+  toFilter
+    | none           => Filter.atBot
+    | some none      => Filter.atTop
+    | some (some x') => nhds x'
 
-
-instance : LimSpecsOut Real where
+instance (priority := high) : LimitOutput Real where
   param := EReal
-  toFilter
-    | none           => Filter.atBot
-    | some none      => Filter.atTop
-    | some (some x') => nhds x'
+  toFilter := ereal_to_filter_real.toFilter
 
-instance : LimSpecsIn Real EReal where
-  toFilter
-    | none           => Filter.atBot
-    | some none      => Filter.atTop
-    | some (some x') => nhds x'
+/- Instances for metric spaces in general -/
+instance {X : Type*} [MetricSpace X] : ToFilter X X := ⟨nhds⟩
 
-instance : LimSpecsIn Real Real where
-  toFilter := nhds
+instance {X : Type*} [MetricSpace X] : LimitOutput X := ⟨X, nhds⟩
 
 
+
+
+/- Test type checking -/
+
+/- Test for the functions `Real → Real` -/
 #check myLim (fun x : Real => 1/x) (0 : Real)
 #check myLim (fun x : Real => 1/x) (⊤ : EReal)
 #check myLim (fun x : Real => 1/x) (0 : EReal)
 #check_failure myLim (fun x : Real => 1/x) (0 : Nat)
 
+#check myLim (fun x : Real => 1/x) (⊤ : EReal) = MaybeUndefined.of_defined (Real.toEReal 0)
+#check myLim (fun x : Real => 1/x) (2 : Real)  = MaybeUndefined.of_defined (Real.toEReal 0.5)
 
-#check myLim (fun x : Real => 1/x) (⊤ : EReal) =
-  MaybeUndefined.of_defined (Real.toEReal 0)
-#check myLim (fun x : Real => 1/x) (2 : Real) =
-  MaybeUndefined.of_defined (Real.toEReal 0.5)
+
+/- Test for functions to and from generic metric spaces -/
+section test_metricspace
+
+variable {Y : Type*} [MetricSpace Y] {a : Y}
+
+#check myLim (fun y : Y => y) a
+#check_failure myLim (fun y : Y => y) (0 : Real)
+#check myLim (fun y : Y => y) a = MaybeUndefined.of_defined a
+#check myLim (fun y : Y => dist y a) a = MaybeUndefined.of_defined (Real.toEReal 0)
+#check myLim (fun y : Y => 1/(dist y a)) a = MaybeUndefined.of_defined (⊤ : EReal)
+
+end test_metricspace
