@@ -49,6 +49,11 @@ end MaybeUndefined
 
 
 notation "Number" => Real
+def RealNumber : Set Number := {x | ∃ r : ℝ, x = r}
+def RatNumber  : Set Number := {x | ∃ q : ℚ, x = q}
+def IntNumber  : Set Number := {x | ∃ z : ℤ, x = z}
+def NatNumber  : Set Number := {x | ∃ n : ℕ, x = n}
+
 
 
 class ToFilter (α' α : Type*) where
@@ -58,14 +63,6 @@ class LimitOutput (β : Type*) where
   points : Type*
   toFilter : points → Filter β
 
-
-def myTendsto {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
-  (f : α → β) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
-    Filter.Tendsto f (ToFilter.toFilter x₀) (LimitOutput.toFilter y₀)
-
-def myLim {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
-  (f : α → β) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
-  MaybeUndefined.mk (myTendsto f x₀)
 
 /- Instances for functions in the Reals, or Real-valued functions -/
 instance ereal_to_filter_real : ToFilter EReal Real where
@@ -86,7 +83,15 @@ instance {X : Type*} [MetricSpace X] : LimitOutput X := ⟨X, nhds⟩
 
 
 
-/- Test type checking -/
+namespace LimitNoDomain
+
+def myTendsto {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+  (f : α → β) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
+    Filter.Tendsto f (ToFilter.toFilter x₀) (LimitOutput.toFilter y₀)
+
+def myLim {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+  (f : α → β) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
+  MaybeUndefined.mk (myTendsto f x₀)
 
 /- Test for the functions `Real → Real` -/
 #check myLim (fun x : Real => 1/x) (0 : Real)
@@ -99,8 +104,6 @@ instance {X : Type*} [MetricSpace X] : LimitOutput X := ⟨X, nhds⟩
 
 
 /- Test for functions to and from generic metric spaces -/
-section test_metricspace
-
 variable {Y : Type*} [MetricSpace Y] {a : Y}
 
 #check myLim (fun y : Y => y) a
@@ -109,4 +112,139 @@ variable {Y : Type*} [MetricSpace Y] {a : Y}
 #check myLim (fun y : Y => dist y a) a = MaybeUndefined.of_defined (Real.toEReal 0)
 #check myLim (fun y : Y => 1/(dist y a)) a = MaybeUndefined.of_defined (⊤ : EReal)
 
-end test_metricspace
+end LimitNoDomain
+
+
+
+namespace Limit
+
+def myTendsto {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+  (f : α → β) (D : Set α) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
+    Filter.Tendsto f (ToFilter.toFilter x₀ ⊓ Filter.principal D) (LimitOutput.toFilter y₀)
+
+def myLim {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+  (f : α → β) (D : Set α) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
+  MaybeUndefined.mk (myTendsto f D x₀)
+
+/- Test for the functions `Real → Real` -/
+#check myLim (fun x : Real => 1/x) RealNumber (0 : Real)
+#check myLim (fun x : Real => 1/x) NatNumber (⊤ : EReal)
+
+#check myLim (fun x : Real => 1/x) RealNumber (⊤ : EReal) = (Real.toEReal 0)
+#check myLim (fun x : Real => 1/x) NatNumber (2 : Real) = (Real.toEReal 0.5)
+
+
+def tendsto_seq {β : Type*} [LimitOutput β] (a : Number → β) (y₀ : LimitOutput.points β) : Prop :=
+  myTendsto a NatNumber (⊤ : EReal) y₀
+
+def lim_seq {β : Type*} [LimitOutput β] (a : Number → β) :
+  MaybeUndefined (LimitOutput.points β) := MaybeUndefined.mk (tendsto_seq a)
+
+
+
+/- Rewrite `myTendsTo` and `tendsto_seq` to familiar definitions from analysis -/
+
+open Filter
+
+
+/- Definitions for general convergence of functions, i.e. `myTendsTo`-/
+
+/- Input `x → x₀` -/
+
+lemma tendsto_pt_pt_def {X Y : Type*} [MetricSpace X] [MetricSpace Y]
+  {f : X → Y} {D : Set X} {x₀ : X} {y₀ : Y} :
+  myTendsto f D x₀ y₀ ↔
+    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε
+  := sorry
+
+lemma tendsto_pt_inf_def {X : Type*} [MetricSpace X]
+  {f : X → Number} {D : Set X} {x₀ : X} :
+  myTendsto f D x₀ (⊤ : EReal) ↔
+    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M
+  := sorry
+
+lemma tendsto_pt_neginf_def {X : Type*} [MetricSpace X]
+  {f : X → Number} {D : Set X} {x₀ : X} :
+  myTendsto f D x₀ (⊥ : EReal) ↔
+    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M
+  := sorry
+
+/- Input `x → ∞` -/
+
+lemma tendsto_inf_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y} {D : Set Number} {y₀ : Y} :
+  myTendsto f D (⊤ : EReal) y₀ ↔
+    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε :=
+  by
+  have h_tendsto : myTendsto f D (⊤ : EReal) y₀ ↔ Tendsto f (atTop ⊓ 𝓟 D) (nhds y₀) := by rfl
+  rw [h_tendsto]
+  rw [Metric.tendsto_nhds]
+  simp only [Filter.eventually_iff]
+  constructor <;> intro h ε εpos
+  · simp only [Filter.mem_inf_iff] at h
+    obtain ⟨u, hu, s, hs, heq⟩ := h ε εpos
+    simp only [mem_atTop_sets] at hu
+    obtain ⟨z, hz⟩ := hu
+    simp [Set.ext_iff] at heq; simp only [heq]
+    use z
+    exact (fun x xinD xgtz => ⟨hz x (le_of_lt xgtz), hs xinD⟩)
+  · obtain ⟨z, hz⟩ := h ε εpos
+    apply @Filter.monotone_mem _ _ ({x | x ≥ z + 1} ∩ D)
+    · rintro x ⟨xgtzplus, xinD⟩
+      refine hz x xinD (lt_of_lt_of_le ?_ xgtzplus)
+      norm_num
+    apply Filter.inter_mem_inf
+    · apply mem_atTop
+    · apply Filter.mem_principal_self
+
+lemma tendsto_inf_inf_def {f : Number → Number} {D : Set Number} :
+  myTendsto f D (⊤ : EReal) (⊤ : EReal) ↔
+    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M
+  := sorry
+
+lemma tendsto_inf_neginf_def {f : Number → Number} {D : Set Number} :
+  myTendsto f D (⊤ : EReal) (⊥ : EReal) ↔
+    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M
+  := sorry
+
+/- input `x → -∞`-/
+
+lemma tendsto_neginf_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y} {D : Set Number} {y₀ : Y} :
+  myTendsto f D (⊥ : EReal) y₀ ↔
+    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε
+  := sorry
+
+lemma tendsto_neginf_inf_def {f : Number → Number} {D : Set Number} :
+  myTendsto f D (⊥ : EReal) (⊤ : EReal) ↔
+    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M
+  := sorry
+
+lemma tendsto_neginf_neginf_def {f : Number → Number} {D : Set Number} :
+  myTendsto f D (⊥ : EReal) (⊥ : EReal) ↔
+    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M
+  := sorry
+
+
+
+/- Translation into definitions for convergence of sequences -/
+
+lemma tendsto_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
+  tendsto_seq a p ↔
+    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε :=
+  by
+  unfold tendsto_seq
+  rw [tendsto_inf_pt_def]
+  constructor <;> intro h ε εpos
+  · obtain ⟨z, hz⟩ := h ε εpos
+    obtain ⟨N, zgtN⟩ := exists_nat_gt z
+    use N, ⟨N, rfl⟩
+    intro n nnat ngeN
+    apply hz n nnat
+    exact lt_of_lt_of_le zgtN ngeN
+  · obtain ⟨N, Nnat, hN⟩ := h ε εpos
+    use N
+    intro n nnat ngtN
+    exact hN n nnat (le_of_lt ngtN)
+
+
+
+end Limit
