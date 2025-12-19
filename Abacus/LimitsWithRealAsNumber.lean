@@ -56,7 +56,7 @@ def NatNumber  : Set Number := {x | ∃ n : ℕ, x = n}
 
 
 
-class ToFilter (α' α : Type*) where
+class LimitInput (α' α : Type*) where
   toFilter : α' → Filter α
 
 class LimitOutput (β : Type*) where
@@ -64,32 +64,38 @@ class LimitOutput (β : Type*) where
   toFilter : points → Filter β
 
 
+open Topology
+
 /- Instances for functions in the Reals, or Real-valued functions -/
-instance ereal_to_filter_real : ToFilter EReal Real where
+instance ereal_to_filter_real : LimitInput EReal Real where
   toFilter
     | none           => Filter.atBot
     | some none      => Filter.atTop
-    | some (some x') => nhds x'
+    | some (some x') => 𝓝[≠] x'
 
 instance (priority := high) : LimitOutput Real where
   points := EReal
-  toFilter := ereal_to_filter_real.toFilter
+  toFilter
+    | none           => Filter.atBot
+    | some none      => Filter.atTop
+    | some (some x') => 𝓝 x'
 
-/- Instances for metric spaces in general -/
-instance {X : Type*} [MetricSpace X] : ToFilter X X := ⟨nhds⟩
 
-instance {X : Type*} [MetricSpace X] : LimitOutput X := ⟨X, nhds⟩
+/- Instances for topological spaces in general -/
+instance {X : Type*} [TopologicalSpace X] : LimitInput X X := ⟨fun x => 𝓝[≠] x⟩
+
+instance {X : Type*} [TopologicalSpace X] : LimitOutput X := ⟨X, 𝓝⟩
 
 
 
 
 namespace LimitNoDomain
 
-def myTendsto {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+def myTendsto {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
   (f : α → β) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
-    Filter.Tendsto f (ToFilter.toFilter x₀) (LimitOutput.toFilter y₀)
+    Filter.Tendsto f (LimitInput.toFilter x₀) (LimitOutput.toFilter y₀)
 
-def myLim {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
   (f : α → β) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
   MaybeUndefined.mk (myTendsto f x₀)
 
@@ -118,11 +124,11 @@ end LimitNoDomain
 
 namespace Limit
 
-def myTendsto {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+def myTendsto {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
   (f : α → β) (D : Set α) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
-    Filter.Tendsto f (ToFilter.toFilter x₀ ⊓ Filter.principal D) (LimitOutput.toFilter y₀)
+    Filter.Tendsto f (LimitInput.toFilter x₀ ⊓ Filter.principal D) (LimitOutput.toFilter y₀)
 
-def myLim {α α' β : Type*} [ToFilter α' α] [LimitOutput β]
+def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
   (f : α → β) (D : Set α) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
   MaybeUndefined.mk (myTendsto f D x₀)
 
@@ -142,7 +148,8 @@ def lim_seq {β : Type*} [LimitOutput β] (a : Number → β) :
 
 
 
-/- Rewrite `myTendsTo` and `tendsto_seq` to familiar definitions from analysis -/
+/- Rewrite `myTendsTo` and `tendsto_seq` to **all the** familiar definitions from analysis
+for metric spaces -/
 
 open Filter
 
@@ -157,13 +164,19 @@ lemma tendsto_pt_pt_def {X Y : Type*} [MetricSpace X] [MetricSpace Y]
     ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε
   := sorry
 
-lemma tendsto_pt_inf_def {X : Type*} [MetricSpace X]
+lemma tendsto_pt_nr_def {X : Type*} [MetricSpace X]
+  {f : X → Number} {D : Set X} {x₀ : X} {y₀ : Number} :
+  myTendsto f D x₀ y₀.toEReal ↔
+    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε
+  := sorry
+
+lemma tendsto_pt_infty_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} :
   myTendsto f D x₀ (⊤ : EReal) ↔
     ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M
   := sorry
 
-lemma tendsto_pt_neginf_def {X : Type*} [MetricSpace X]
+lemma tendsto_pt_neginfty_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} :
   myTendsto f D x₀ (⊥ : EReal) ↔
     ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M
@@ -171,7 +184,7 @@ lemma tendsto_pt_neginf_def {X : Type*} [MetricSpace X]
 
 /- Input `x → ∞` -/
 
-lemma tendsto_inf_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y} {D : Set Number} {y₀ : Y} :
+lemma tendsto_infty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y} {D : Set Number} {y₀ : Y} :
   myTendsto f D (⊤ : EReal) y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε :=
   by
@@ -196,29 +209,39 @@ lemma tendsto_inf_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y} {D : Set
     · apply mem_atTop
     · apply Filter.mem_principal_self
 
-lemma tendsto_inf_inf_def {f : Number → Number} {D : Set Number} :
+lemma tendsto_infty_nr_def {f : Number → Number} {D : Set Number} {y₀ : Number} :
+  myTendsto f D (⊤ : EReal) y₀.toEReal ↔
+    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε
+  := sorry
+
+lemma tendsto_infty_infty_def {f : Number → Number} {D : Set Number} :
   myTendsto f D (⊤ : EReal) (⊤ : EReal) ↔
     ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M
   := sorry
 
-lemma tendsto_inf_neginf_def {f : Number → Number} {D : Set Number} :
+lemma tendsto_infty_neginfty_def {f : Number → Number} {D : Set Number} :
   myTendsto f D (⊤ : EReal) (⊥ : EReal) ↔
     ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M
   := sorry
 
 /- input `x → -∞`-/
 
-lemma tendsto_neginf_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y} {D : Set Number} {y₀ : Y} :
+lemma tendsto_neginfty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y} {D : Set Number} {y₀ : Y} :
   myTendsto f D (⊥ : EReal) y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε
   := sorry
 
-lemma tendsto_neginf_inf_def {f : Number → Number} {D : Set Number} :
+lemma tendsto_neginfty_nr_def {f : Number → Number} {D : Set Number} {y₀ : Number} :
+  myTendsto f D (⊥ : EReal) y₀.toEReal ↔
+    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε
+  := sorry
+
+lemma tendsto_neginfty_infty_def {f : Number → Number} {D : Set Number} :
   myTendsto f D (⊥ : EReal) (⊤ : EReal) ↔
     ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M
   := sorry
 
-lemma tendsto_neginf_neginf_def {f : Number → Number} {D : Set Number} :
+lemma tendsto_neginfty_neginfty_def {f : Number → Number} {D : Set Number} :
   myTendsto f D (⊥ : EReal) (⊥ : EReal) ↔
     ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M
   := sorry
@@ -232,7 +255,7 @@ lemma tendsto_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} 
     ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε :=
   by
   unfold tendsto_seq
-  rw [tendsto_inf_pt_def]
+  rw [tendsto_infty_pt_def]
   constructor <;> intro h ε εpos
   · obtain ⟨z, hz⟩ := h ε εpos
     obtain ⟨N, zgtN⟩ := exists_nat_gt z
@@ -244,6 +267,64 @@ lemma tendsto_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} 
     use N
     intro n nnat ngtN
     exact hN n nnat (le_of_lt ngtN)
+
+
+
+
+/- At most one limit point -/
+
+def AccPts {X : Type u_1} [TopologicalSpace X] (D : Set X) : Set X := {x | AccPt x (𝓟 D)}
+
+/- Output in metric space -/
+
+lemma myTendsto_pt_pt_unique {X Y : Type*} [MetricSpace X] [MetricSpace Y] {f : X → Y}
+  {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {a b : Y}
+  (ha : myTendsto f D x₀ a) (hb : myTendsto f D x₀ b) : a = b :=
+  by
+  #check tendsto_nhds_unique'
+  sorry
+
+lemma myTendsto_infty_pt_unique {Y : Type*} [MetricSpace Y] {f : Number → Y}
+  {D : Set Number} (hD : ¬BddAbove D) {a b : Y}
+  (ha : myTendsto f D (⊤ : EReal) a) (hb : myTendsto f D (⊤ : EReal) b) : a = b :=
+  by
+  apply tendsto_nhds_unique' _ ha hb
+  simp only [LimitInput.toFilter]
+  rw [inf_principal_neBot_iff]
+  intro U hU
+  simp only [mem_atTop_sets] at hU
+  obtain ⟨z, hz⟩ := hU
+  rw [not_bddAbove_iff] at hD
+  obtain ⟨x, xinD, zltx⟩ := hD z
+  use x, hz _ (le_of_lt zltx)
+
+lemma myTendsto_neginf_pt_unique {Y : Type*} [MetricSpace Y] {f : Number → Y}
+  {D : Set Number} (hD : ¬BddBelow D) {a b : Y}
+  (ha : myTendsto f D (⊥ : EReal) a) (hb : myTendsto f D (⊥ : EReal) b) : a = b :=
+  by
+  #check tendsto_nhds_unique'
+  sorry
+
+/- Output in `Number` -/
+
+lemma myTendsto_pt_nr_unique {X : Type*} [MetricSpace X] {f : X → Number}
+  {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {a' b' : EReal}
+  (ha' : myTendsto f D x₀ a') (hb' : myTendsto f D x₀ b') : a' = b' :=
+  by
+  sorry
+
+lemma myTendsto_infty_nr_unique {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D)
+  {a' b' : EReal} (ha' : myTendsto f D (⊤ : EReal) a') (hb' : myTendsto f D (⊤ : EReal) b') :
+    a' = b' :=
+  by
+  sorry
+
+lemma myTendsto_neginfty_nr_unique {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D)
+  {a' b' : EReal} (ha' : myTendsto f D (⊥ : EReal) a') (hb' : myTendsto f D (⊥ : EReal) b') :
+    a' = b' :=
+  by
+  sorry
+
 
 
 
