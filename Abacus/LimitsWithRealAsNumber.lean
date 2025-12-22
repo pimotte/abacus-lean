@@ -3,6 +3,7 @@ import Mathlib.Data.EReal.Basic
 import Mathlib.Topology.MetricSpace.Defs
 import Mathlib.Topology.Instances.Real.Lemmas
 
+
 def MaybeUndefined (α : Type*) := Set α
 /- `Set α` instead of `α → Prop` because this gives lots of nice infrastructure for free,
 such as `Set.singleton` and `Set.map2` -/
@@ -60,6 +61,7 @@ def RatNumber  : Set Number := {x | ∃ q : ℚ, x = q}
 def IntNumber  : Set Number := {x | ∃ z : ℤ, x = z}
 def NatNumber  : Set Number := {x | ∃ n : ℕ, x = n}
 
+notation "∞" => (⊤ : EReal)
 
 
 class LimitInput (α' α : Type*) where
@@ -73,7 +75,7 @@ class LimitOutput (β : Type*) where
 open Topology
 
 /- Instances for functions in the Reals, or Real-valued functions -/
-instance ereal_to_filter_real : LimitInput EReal Real where
+instance : LimitInput EReal Real where
   toFilter
     | none           => Filter.atBot
     | some none      => Filter.atTop
@@ -86,6 +88,8 @@ instance (priority := high) : LimitOutput Real where
     | some none      => Filter.atTop
     | some (some x') => 𝓝 x'
 
+instance : Coe Number (LimitOutput.points Number) where
+  coe := Real.toEReal
 
 /- Instances for topological spaces in general -/
 instance {X : Type*} [TopologicalSpace X] : LimitInput X X := ⟨fun x => 𝓝[≠] x⟩
@@ -107,12 +111,12 @@ def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
 
 /- Test for the functions `Real → Real` -/
 #check myLim (fun x : Real => 1/x) (0 : Real)
-#check myLim (fun x : Real => 1/x) (⊤ : EReal)
+#check myLim (fun x : Real => 1/x) ∞
 #check myLim (fun x : Real => 1/x) (0 : EReal)
 #check_failure myLim (fun x : Real => 1/x) (0 : Nat)
 
-#check myLim (fun x : Real => 1/x) (⊤ : EReal) = MaybeUndefined.of_defined (Real.toEReal 0)
-#check myLim (fun x : Real => 1/x) (2 : Real)  = (Real.toEReal 0.5)
+#check myLim (fun x : Real => 1/x) ∞ = (0 : Real)
+#check myLim (fun x : Real => 1/x) (2 : Real) = (0.5 : Real)
 
 
 /- Test for functions to and from generic metric spaces -/
@@ -120,9 +124,9 @@ variable {Y : Type*} [MetricSpace Y] {a : Y}
 
 #check myLim (fun y : Y => y) a
 #check_failure myLim (fun y : Y => y) (0 : Real)
-#check myLim (fun y : Y => y) a = MaybeUndefined.of_defined a
-#check myLim (fun y : Y => dist y a) a = MaybeUndefined.of_defined (Real.toEReal 0)
-#check myLim (fun y : Y => 1/(dist y a)) a = MaybeUndefined.of_defined (⊤ : EReal)
+#check myLim (fun y : Y => y) a = a
+#check myLim (fun y : Y => dist y a) a = (0 : Real)
+#check myLim (fun y : Y => 1/(dist y a)) a = ∞
 
 end LimitNoDomain
 
@@ -140,14 +144,14 @@ def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
 
 /- Test for the functions `Real → Real` -/
 #check myLim (fun x : Real => 1/x) RealNumber (0 : Real)
-#check myLim (fun x : Real => 1/x) NatNumber (⊤ : EReal)
+#check myLim (fun x : Real => 1/x) NatNumber ∞
 
-#check myLim (fun x : Real => 1/x) RealNumber (⊤ : EReal) = (Real.toEReal 0)
-#check myLim (fun x : Real => 1/x) NatNumber (2 : Real) = (Real.toEReal 0.5)
+#check myLim (fun x : Real => 1/x) RealNumber ∞ = (0 : Real)
+#check myLim (fun x : Real => 1/x) NatNumber (2 : Real) = (0.5 : Real)
 
 
 def tendsto_seq {β : Type*} [LimitOutput β] (a : Number → β) (y₀ : LimitOutput.points β) : Prop :=
-  myTendsto a NatNumber (⊤ : EReal) y₀
+  myTendsto a NatNumber ∞ y₀
 
 def lim_seq {β : Type*} [LimitOutput β] (a : Number → β) :
   MaybeUndefined (LimitOutput.points β) := MaybeUndefined.mk (tendsto_seq a)
@@ -172,19 +176,19 @@ lemma myTendsto_pt_pt_def {X Y : Type*} [MetricSpace X] [MetricSpace Y]
 
 lemma myTendsto_pt_nr_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} {y₀ : Number} :
-  myTendsto f D x₀ y₀.toEReal ↔
+  myTendsto f D x₀ y₀ ↔
     ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε
   := sorry
 
 lemma myTendsto_pt_infty_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} :
-  myTendsto f D x₀ (⊤ : EReal) ↔
+  myTendsto f D x₀ ∞ ↔
     ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M
   := sorry
 
 lemma myTendsto_pt_neginfty_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} :
-  myTendsto f D x₀ (⊥ : EReal) ↔
+  myTendsto f D x₀ (-∞) ↔
     ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M
   := sorry
 
@@ -192,7 +196,7 @@ lemma myTendsto_pt_neginfty_def {X : Type*} [MetricSpace X]
 
 lemma myTendsto_infty_pt_def {Y : Type*} [MetricSpace Y]
   {f : Number → Y} {D : Set Number} {y₀ : Y} :
-  myTendsto f D (⊤ : EReal) y₀ ↔
+  myTendsto f D ∞ y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε :=
   by
   have h_tendsto : myTendsto f D (⊤ : EReal) y₀ ↔ Tendsto f (atTop ⊓ 𝓟 D) (nhds y₀) := by rfl
@@ -217,17 +221,17 @@ lemma myTendsto_infty_pt_def {Y : Type*} [MetricSpace Y]
     · apply Filter.mem_principal_self
 
 lemma myTendsto_infty_nr_def {f : Number → Number} {D : Set Number} {y₀ : Number} :
-  myTendsto f D (⊤ : EReal) y₀.toEReal ↔
+  myTendsto f D ∞ y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε
   := sorry
 
 lemma myTendsto_infty_infty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D (⊤ : EReal) (⊤ : EReal) ↔
+  myTendsto f D ∞ ∞ ↔
     ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M
   := sorry
 
 lemma myTendsto_infty_neginfty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D (⊤ : EReal) (⊥ : EReal) ↔
+  myTendsto f D ∞ (-∞) ↔
     ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M
   := sorry
 
@@ -235,22 +239,22 @@ lemma myTendsto_infty_neginfty_def {f : Number → Number} {D : Set Number} :
 
 lemma myTendsto_neginfty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
   {D : Set Number} {y₀ : Y} :
-  myTendsto f D (⊥ : EReal) y₀ ↔
+  myTendsto f D (-∞) y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε
   := sorry
 
 lemma myTendsto_neginfty_nr_def {f : Number → Number} {D : Set Number} {y₀ : Number} :
-  myTendsto f D (⊥ : EReal) y₀.toEReal ↔
+  myTendsto f D (-∞) y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε
   := sorry
 
 lemma myTendsto_neginfty_infty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D (⊥ : EReal) (⊤ : EReal) ↔
+  myTendsto f D (-∞) ∞ ↔
     ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M
   := sorry
 
 lemma myTendsto_neginfty_neginfty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D (⊥ : EReal) (⊥ : EReal) ↔
+  myTendsto f D (-∞) (-∞) ↔
     ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M
   := sorry
 
@@ -277,17 +281,17 @@ lemma tendsto_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} 
     exact hN n nnat (le_of_lt ngtN)
 
 lemma tendsto_seq_nr_def {a : Number → Number} {p : Number} :
-  tendsto_seq a p.toEReal ↔
+  tendsto_seq a p ↔
     ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
   sorry
 
 lemma tendsto_seq_infty_def {a : Number → Number} :
-  tendsto_seq a (⊤ : EReal) ↔
+  tendsto_seq a ∞ ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n > M := by
   sorry
 
 lemma tendsto_seq_neginfty_def {a : Number → Number} :
-  tendsto_seq a (⊥ : EReal) ↔
+  tendsto_seq a (-∞) ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M := by
   sorry
 
@@ -340,7 +344,7 @@ lemma neBot_inputLimit_pt_iff_accPt {X : Type*} [MetricSpace X] {D : Set X} {x�
   rfl
 
 lemma neBot_inputLimit_infty_iff_notBddAbove {D : Set Number} :
-  ¬BddAbove D ↔ NeBot (LimitInput.toFilter (⊤ : EReal) ⊓ 𝓟 D) := by
+  ¬BddAbove D ↔ NeBot (LimitInput.toFilter ∞ ⊓ 𝓟 D) := by
   simp only [LimitInput.toFilter]
   rw [inf_principal_neBot_iff]
   simp only [mem_atTop_sets]
@@ -358,7 +362,8 @@ lemma neBot_inputLimit_infty_iff_notBddAbove {D : Set Number} :
     exact lt_of_lt_of_le (lt_add_one x) hy
 
 lemma neBot_inputLimit_neginfty_iff_notBddBelow {D : Set Number} :
-  ¬BddBelow D ↔ NeBot (LimitInput.toFilter (⊥ : EReal) ⊓ 𝓟 D) := by
+  ¬BddBelow D ↔ NeBot (LimitInput.toFilter (-∞) ⊓ 𝓟 D) := by
+  simp only [EReal.neg_top]
   simp only [LimitInput.toFilter]
   rw [inf_principal_neBot_iff]
   simp only [mem_atBot_sets]
@@ -393,13 +398,13 @@ lemma myTendsto_pt_pt_unique {X Y : Type*} [MetricSpace X] [MetricSpace Y] {f : 
 
 lemma myTendsto_infty_pt_unique {Y : Type*} [MetricSpace Y] {f : Number → Y}
   {D : Set Number} (hD : ¬BddAbove D) {a b : Y}
-  (ha : myTendsto f D (⊤ : EReal) a) (hb : myTendsto f D (⊤ : EReal) b) : a = b := by
+  (ha : myTendsto f D ∞ a) (hb : myTendsto f D ∞ b) : a = b := by
   apply myTendsto_metric_unique _ ha hb
   exact neBot_inputLimit_infty_iff_notBddAbove.mp hD
 
 lemma myTendsto_neginfty_pt_unique {Y : Type*} [MetricSpace Y] {f : Number → Y}
   {D : Set Number} (hD : ¬BddBelow D) {a b : Y}
-  (ha : myTendsto f D (⊥ : EReal) a) (hb : myTendsto f D (⊥ : EReal) b) : a = b := by
+  (ha : myTendsto f D (-∞) a) (hb : myTendsto f D (-∞) b) : a = b := by
   apply myTendsto_metric_unique _ ha hb
   exact neBot_inputLimit_neginfty_iff_notBddBelow.mp hD
 
@@ -412,13 +417,13 @@ lemma myTendsto_pt_nr_unique {X : Type*} [MetricSpace X] {f : X → Number}
   exact neBot_inputLimit_pt_iff_accPt.mp hx₀
 
 lemma myTendsto_infty_nr_unique {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D)
-  {a b : EReal} (ha : myTendsto f D (⊤ : EReal) a) (hb : myTendsto f D (⊤ : EReal) b) :
+  {a b : EReal} (ha : myTendsto f D ∞ a) (hb : myTendsto f D ∞ b) :
   a = b := by
   apply myTendsto_number_unique _ ha hb
   exact neBot_inputLimit_infty_iff_notBddAbove.mp hD
 
 lemma myTendsto_neginfty_nr_unique {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D)
-  {a b : EReal} (ha : myTendsto f D (⊥ : EReal) a) (hb : myTendsto f D (⊥ : EReal) b) :
+  {a b : EReal} (ha : myTendsto f D (-∞) a) (hb : myTendsto f D (-∞) b) :
   a = b := by
   apply myTendsto_number_unique _ ha hb
   exact neBot_inputLimit_neginfty_iff_notBddBelow.mp hD
@@ -440,7 +445,7 @@ lemma myLim_pt_pt_def {X Y : Type*} [MetricSpace X] [MetricSpace Y]
 
 lemma myLim_pt_nr_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Number} :
-  myLim f D x₀ = y₀.toEReal ↔
+  myLim f D x₀ = y₀ ↔
     ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε := by
   rw [← myTendsto_pt_pt_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -449,7 +454,7 @@ lemma myLim_pt_nr_def {X : Type*} [MetricSpace X]
 
 lemma myLim_pt_infty_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
-  myLim f D x₀ = (⊤ : EReal) ↔
+  myLim f D x₀ = ∞ ↔
     ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M := by
   rw [← myTendsto_pt_infty_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -458,7 +463,7 @@ lemma myLim_pt_infty_def {X : Type*} [MetricSpace X]
 
 lemma myLim_pt_neginfty_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
-  myLim f D x₀ = (⊥ : EReal) ↔
+  myLim f D x₀ = (-∞ : EReal) ↔ -- TODO fix parsing of notation `-∞` as coercion to `EReal ??`
     ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M := by
   rw [← myTendsto_pt_neginfty_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -469,7 +474,7 @@ lemma myLim_pt_neginfty_def {X : Type*} [MetricSpace X]
 
 lemma myLim_infty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
   {D : Set Number} (hD : ¬BddAbove D) {y₀ : Y} :
-  myLim f D (⊤ : EReal) = y₀ ↔
+  myLim f D ∞ = y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε := by
   rw [← myTendsto_infty_pt_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -477,7 +482,7 @@ lemma myLim_infty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
   apply myTendsto_infty_pt_unique hD
 
 lemma myLim_infty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) {y₀ : Number} :
-  myLim f D (⊤ : EReal) = y₀.toEReal ↔
+  myLim f D ∞ = y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε := by
   rw [← myTendsto_infty_pt_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -485,7 +490,7 @@ lemma myLim_infty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbo
   apply myTendsto_infty_nr_unique hD
 
 lemma myLim_infty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D (⊤ : EReal) = (⊤ : EReal) ↔
+  myLim f D ∞ = ∞ ↔
     ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M := by
   rw [← myTendsto_infty_infty_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -493,7 +498,7 @@ lemma myLim_infty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬Bdd
   apply myTendsto_infty_nr_unique hD
 
 lemma myLim_infty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D (⊤ : EReal) = (⊥ : EReal) ↔
+  myLim f D ∞ = (-∞ : EReal) ↔
     ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M := by
   rw [← myTendsto_infty_neginfty_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -504,7 +509,7 @@ lemma myLim_infty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬
 
 lemma myLim_neginfty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
   {D : Set Number} (hD : ¬BddBelow D) {y₀ : Y} :
-  myLim f D (⊥ : EReal) = y₀ ↔
+  myLim f D (-∞) = y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε := by
   rw [← myTendsto_neginfty_pt_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -512,7 +517,7 @@ lemma myLim_neginfty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
   apply myTendsto_neginfty_pt_unique hD
 
 lemma myLim_neginfty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D)
-  {y₀ : Number} : myLim f D (⊥ : EReal) = y₀.toEReal ↔
+  {y₀ : Number} : myLim f D (-∞) = y₀ ↔
     ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε := by
   rw [← myTendsto_neginfty_pt_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -520,7 +525,7 @@ lemma myLim_neginfty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬Bdd
   apply myTendsto_neginfty_nr_unique hD
 
 lemma myLim_neginfty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D (⊥ : EReal) = (⊤ : EReal) ↔
+  myLim f D (-∞) = ∞ ↔
     ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M := by
   rw [← myTendsto_neginfty_infty_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -528,7 +533,7 @@ lemma myLim_neginfty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬
   apply myTendsto_neginfty_nr_unique hD
 
 lemma myLim_neginfty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D (⊥ : EReal) = (⊥ : EReal) ↔
+  myLim f D (-∞) = (-∞ : EReal) ↔
     ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M := by
   rw [← myTendsto_neginfty_neginfty_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -553,7 +558,7 @@ lemma lim_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
   apply myTendsto_infty_pt_unique notBddAbove_natNumber
 
 lemma lim_seq_nr_def {a : Number → Number} {p : Number} :
-  lim_seq a = p.toEReal ↔
+  lim_seq a = p ↔
     ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
   rw [← tendsto_seq_nr_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -561,7 +566,7 @@ lemma lim_seq_nr_def {a : Number → Number} {p : Number} :
   apply myTendsto_infty_nr_unique notBddAbove_natNumber
 
 lemma lim_seq_infty_def {a : Number → Number} :
-  lim_seq a = (⊤ : EReal) ↔
+  lim_seq a = ∞ ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n > M := by
   rw [← tendsto_seq_infty_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
@@ -569,7 +574,7 @@ lemma lim_seq_infty_def {a : Number → Number} :
   apply myTendsto_infty_nr_unique notBddAbove_natNumber
 
 lemma lim_seq_neginfty_def {a : Number → Number} :
-  lim_seq a = (⊥ : EReal) ↔
+  lim_seq a = (-∞ : EReal) ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M := by
   rw [← tendsto_seq_neginfty_def]
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
