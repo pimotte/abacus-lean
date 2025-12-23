@@ -150,11 +150,8 @@ def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
 #check myLim (fun x : Real => 1/x) NatNumber (2 : Real) = (0.5 : Real)
 
 
-def tendsto_seq {β : Type*} [LimitOutput β] (a : Number → β) (y₀ : LimitOutput.points β) : Prop :=
-  myTendsto a NatNumber ∞ y₀
-
 def lim_seq {β : Type*} [LimitOutput β] (a : Number → β) :
-  MaybeUndefined (LimitOutput.points β) := MaybeUndefined.mk (tendsto_seq a)
+  MaybeUndefined (LimitOutput.points β) := MaybeUndefined.mk (myTendsto a NatNumber ∞)
 
 
 
@@ -263,10 +260,9 @@ lemma myTendsto_neginfty_neginfty_def {f : Number → Number} {D : Set Number} :
 /- Translation into definitions for convergence of sequences -/
 
 lemma tendsto_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
-  tendsto_seq a p ↔
+  myTendsto a NatNumber ∞ p ↔
     ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε :=
   by
-  unfold tendsto_seq
   rw [myTendsto_infty_pt_def]
   constructor <;> intro h ε εpos
   · obtain ⟨z, hz⟩ := h ε εpos
@@ -281,17 +277,17 @@ lemma tendsto_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} 
     exact hN n nnat (le_of_lt ngtN)
 
 lemma tendsto_seq_nr_def {a : Number → Number} {p : Number} :
-  tendsto_seq a p ↔
+  myTendsto a NatNumber ∞ p ↔
     ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
   sorry
 
 lemma tendsto_seq_infty_def {a : Number → Number} :
-  tendsto_seq a ∞ ↔
+  myTendsto a NatNumber ∞ ∞ ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n > M := by
   sorry
 
 lemma tendsto_seq_neginfty_def {a : Number → Number} :
-  tendsto_seq a (-∞) ↔
+  myTendsto a NatNumber ∞ (-∞) ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M := by
   sorry
 
@@ -429,113 +425,89 @@ lemma myTendsto_neginfty_nr_unique {f : Number → Number} {D : Set Number} (hD 
   exact neBot_inputLimit_neginfty_iff_notBddBelow.mp hD
 
 
+/- Characterization of limits in terms of `myTendsto` -/
 
-/- Characterization of limits of functions -/
+/- Functions -/
 
-/- Input `x → x₀` -/
-
-lemma myLim_pt_pt_def {X Y : Type*} [MetricSpace X] [MetricSpace Y]
+lemma myLim_pt_pt_def' {X Y : Type*} [MetricSpace X] [MetricSpace Y]
   {f : X → Y} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Y} :
-  myLim f D x₀ = y₀ ↔
-    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε := by
-  rw [← myTendsto_pt_pt_def]
+  myLim f D x₀ = y₀ ↔ myTendsto f D x₀ y₀ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_pt_pt_unique hx₀
 
-lemma myLim_pt_nr_def {X : Type*} [MetricSpace X]
+lemma myLim_pt_nr_def' {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Number} :
-  myLim f D x₀ = y₀ ↔
-    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε := by
-  rw [← myTendsto_pt_pt_def]
+  myLim f D x₀ = y₀ ↔ myTendsto f D x₀ y₀ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_pt_nr_unique hx₀
 
-lemma myLim_pt_infty_def {X : Type*} [MetricSpace X]
+lemma myLim_pt_infty_def' {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
-  myLim f D x₀ = ∞ ↔
-    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M := by
-  rw [← myTendsto_pt_infty_def]
+  myLim f D x₀ = ∞ ↔ myTendsto f D x₀ ∞ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_pt_nr_unique hx₀
 
-lemma myLim_pt_neginfty_def {X : Type*} [MetricSpace X]
+lemma myLim_pt_neginfty_def' {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
   myLim f D x₀ = (-∞ : EReal) ↔ -- TODO fix parsing of notation `-∞` as coercion to `EReal ??`
-    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M := by
-  rw [← myTendsto_pt_neginfty_def]
+    myTendsto f D x₀ (-∞) := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_pt_nr_unique hx₀
 
 /- Input `x → ∞` -/
 
-lemma myLim_infty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
+lemma myLim_infty_pt_def' {Y : Type*} [MetricSpace Y] {f : Number → Y}
   {D : Set Number} (hD : ¬BddAbove D) {y₀ : Y} :
-  myLim f D ∞ = y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε := by
-  rw [← myTendsto_infty_pt_def]
+  myLim f D ∞ = y₀ ↔ myTendsto f D ∞ y₀ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_infty_pt_unique hD
 
-lemma myLim_infty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) {y₀ : Number} :
-  myLim f D ∞ = y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε := by
-  rw [← myTendsto_infty_pt_def]
+lemma myLim_infty_nr_def' {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) {y₀ : Number} :
+  myLim f D ∞ = y₀ ↔ myTendsto f D ∞ y₀ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_infty_nr_unique hD
 
-lemma myLim_infty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D ∞ = ∞ ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M := by
-  rw [← myTendsto_infty_infty_def]
+lemma myLim_infty_infty_def' {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
+  myLim f D ∞ = ∞ ↔ myTendsto f D ∞ ∞ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_infty_nr_unique hD
 
-lemma myLim_infty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D ∞ = (-∞ : EReal) ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M := by
-  rw [← myTendsto_infty_neginfty_def]
+lemma myLim_infty_neginfty_def' {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
+  myLim f D ∞ = (-∞ : EReal) ↔ myTendsto f D ∞ (-∞):= by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_infty_nr_unique hD
 
 /- input `x → -∞`-/
 
-lemma myLim_neginfty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
+lemma myLim_neginfty_pt_def' {Y : Type*} [MetricSpace Y] {f : Number → Y}
   {D : Set Number} (hD : ¬BddBelow D) {y₀ : Y} :
-  myLim f D (-∞) = y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε := by
-  rw [← myTendsto_neginfty_pt_def]
+  myLim f D (-∞) = y₀ ↔ myTendsto f D (-∞) y₀ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_neginfty_pt_unique hD
 
-lemma myLim_neginfty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D)
-  {y₀ : Number} : myLim f D (-∞) = y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε := by
-  rw [← myTendsto_neginfty_pt_def]
+lemma myLim_neginfty_nr_def' {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D)
+  {y₀ : Number} : myLim f D (-∞) = y₀ ↔ myTendsto f D (-∞) y₀ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_neginfty_nr_unique hD
 
-lemma myLim_neginfty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D (-∞) = ∞ ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M := by
-  rw [← myTendsto_neginfty_infty_def]
+lemma myLim_neginfty_infty_def' {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
+  myLim f D (-∞) = ∞ ↔ myTendsto f D (-∞) ∞ := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_neginfty_nr_unique hD
 
-lemma myLim_neginfty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D (-∞) = (-∞ : EReal) ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M := by
-  rw [← myTendsto_neginfty_neginfty_def]
+lemma myLim_neginfty_neginfty_def' {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
+  myLim f D (-∞) = (-∞ : EReal) ↔ myTendsto f D (-∞) (-∞) := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_neginfty_nr_unique hD
@@ -549,37 +521,131 @@ lemma notBddAbove_natNumber : ¬BddAbove NatNumber := by
   obtain ⟨N, _⟩ := exists_nat_gt x
   use N, ⟨N, rfl⟩
 
-lemma lim_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
-  lim_seq a = p ↔
-    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
-  rw [← tendsto_seq_pt_def]
+lemma lim_seq_pt_def' {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
+  lim_seq a = p ↔ myTendsto a NatNumber ∞ p := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_infty_pt_unique notBddAbove_natNumber
 
-lemma lim_seq_nr_def {a : Number → Number} {p : Number} :
-  lim_seq a = p ↔
-    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
-  rw [← tendsto_seq_nr_def]
+lemma lim_seq_nr_def' {a : Number → Number} {p : Number} :
+  lim_seq a = p ↔ myTendsto a NatNumber ∞ p := by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
   apply myTendsto_infty_nr_unique notBddAbove_natNumber
+
+lemma lim_seq_infty_def' {a : Number → Number} :
+  lim_seq a = ∞ ↔ myTendsto a NatNumber ∞ ∞ := by
+  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
+  intro y₁ y₂
+  apply myTendsto_infty_nr_unique notBddAbove_natNumber
+
+lemma lim_seq_neginfty_def' {a : Number → Number} :
+  lim_seq a = (-∞ : EReal) ↔ myTendsto a NatNumber ∞ (-∞) := by
+  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
+  intro y₁ y₂
+  apply myTendsto_infty_nr_unique notBddAbove_natNumber
+
+
+/- Characterization of limits in familiar terms -/
+
+/- Functions -/
+
+/- Input `x → x₀` -/
+
+lemma myLim_pt_pt_def {X Y : Type*} [MetricSpace X] [MetricSpace Y]
+  {f : X → Y} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Y} :
+  myLim f D x₀ = y₀ ↔
+    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε := by
+  rw [myLim_pt_pt_def' hx₀, ← myTendsto_pt_pt_def]
+
+lemma myLim_pt_nr_def {X : Type*} [MetricSpace X]
+  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Number} :
+  myLim f D x₀ = y₀ ↔
+    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε := by
+  rw [myLim_pt_nr_def' hx₀, ← myTendsto_pt_pt_def]
+
+lemma myLim_pt_infty_def {X : Type*} [MetricSpace X]
+  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
+  myLim f D x₀ = ∞ ↔
+    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M := by
+  rw [myLim_pt_infty_def' hx₀, ← myTendsto_pt_infty_def]
+
+lemma myLim_pt_neginfty_def {X : Type*} [MetricSpace X]
+  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
+  myLim f D x₀ = (-∞ : EReal) ↔ -- TODO fix parsing of notation `-∞` as coercion to `EReal ??`
+    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M := by
+  rw [myLim_pt_neginfty_def' hx₀, ← myTendsto_pt_neginfty_def]
+
+/- Input `x → ∞` -/
+
+lemma myLim_infty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
+  {D : Set Number} (hD : ¬BddAbove D) {y₀ : Y} :
+  myLim f D ∞ = y₀ ↔
+    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε := by
+  rw [myLim_infty_pt_def' hD, ← myTendsto_infty_pt_def]
+
+lemma myLim_infty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) {y₀ : Number} :
+  myLim f D ∞ = y₀ ↔
+    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε := by
+  rw [myLim_infty_nr_def' hD, ← myTendsto_infty_pt_def]
+  rfl
+
+lemma myLim_infty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
+  myLim f D ∞ = ∞ ↔
+    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M := by
+  rw [myLim_infty_infty_def' hD, ← myTendsto_infty_infty_def]
+
+lemma myLim_infty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
+  myLim f D ∞ = (-∞ : EReal) ↔
+    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M := by
+  rw [myLim_infty_neginfty_def' hD, ← myTendsto_infty_neginfty_def]
+
+/- input `x → -∞`-/
+
+lemma myLim_neginfty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
+  {D : Set Number} (hD : ¬BddBelow D) {y₀ : Y} :
+  myLim f D (-∞) = y₀ ↔
+    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε := by
+  rw [myLim_neginfty_pt_def' hD, ← myTendsto_neginfty_pt_def]
+
+lemma myLim_neginfty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D)
+  {y₀ : Number} : myLim f D (-∞) = y₀ ↔
+    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε := by
+  rw [myLim_neginfty_nr_def' hD, ← myTendsto_neginfty_pt_def]
+  rfl
+
+lemma myLim_neginfty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
+  myLim f D (-∞) = ∞ ↔
+    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M := by
+  rw [myLim_neginfty_infty_def' hD, ← myTendsto_neginfty_infty_def]
+
+lemma myLim_neginfty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
+  myLim f D (-∞) = (-∞ : EReal) ↔
+    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M := by
+  rw [myLim_neginfty_neginfty_def' hD, ← myTendsto_neginfty_neginfty_def]
+
+
+/- Limits of equences -/
+
+lemma lim_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
+  lim_seq a = p ↔
+    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
+  rw [lim_seq_pt_def', ← tendsto_seq_pt_def]
+
+lemma lim_seq_nr_def {a : Number → Number} {p : Number} :
+  lim_seq a = p ↔
+    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
+  rw [lim_seq_nr_def', ← tendsto_seq_nr_def]
 
 lemma lim_seq_infty_def {a : Number → Number} :
   lim_seq a = ∞ ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n > M := by
-  rw [← tendsto_seq_infty_def]
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_nr_unique notBddAbove_natNumber
+  rw [lim_seq_infty_def', ← tendsto_seq_infty_def]
 
 lemma lim_seq_neginfty_def {a : Number → Number} :
   lim_seq a = (-∞ : EReal) ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M := by
-  rw [← tendsto_seq_neginfty_def]
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_nr_unique notBddAbove_natNumber
+  rw [lim_seq_neginfty_def', ← tendsto_seq_neginfty_def]
 
 
 end Limit
