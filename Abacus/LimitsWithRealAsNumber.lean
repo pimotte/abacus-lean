@@ -54,6 +54,37 @@ theorem eq_defined_iff_satisfies_of_unique {α : Type*} {P : α → Prop} {x : �
 end MaybeUndefined
 
 
+-- /- Establish inherited arithmetic operations -/
+-- section MaybeUndefined.Operations
+
+@[to_additive]
+protected def MaybeUndefined.one {α : Type*} [One α] : One (MaybeUndefined α) :=
+  ⟨of_defined 1⟩
+
+attribute [instance] MaybeUndefined.one MaybeUndefined.zero
+
+@[to_additive]
+protected def MaybeUndefined.mul {α : Type*} [Mul α] : Mul (MaybeUndefined α) :=
+  ⟨Set.image2 Mul.mul⟩
+
+attribute [instance] MaybeUndefined.mul MaybeUndefined.add
+
+@[to_additive]
+protected def MaybeUndefined.inv {α : Type*} [Inv α] : Inv (MaybeUndefined α) :=
+  ⟨Set.image Inv.inv⟩
+
+attribute [instance] MaybeUndefined.inv MaybeUndefined.neg
+
+@[to_additive]
+protected def MaybeUndefined.div {α : Type*} [Div α] : Div (MaybeUndefined α) :=
+  ⟨Set.image2 Div.div⟩
+
+attribute [instance] MaybeUndefined.div MaybeUndefined.sub
+
+-- TODO add instance (?) that these indeed satisfy the required properties for these rules
+-- i.e. that `of_defined '' α` has the same structure as `α`
+
+
 
 notation "Number" => Real
 def RealNumber : Set Number := {x | ∃ r : ℝ, x = r}
@@ -62,7 +93,11 @@ def IntNumber  : Set Number := {x | ∃ z : ℤ, x = z}
 def NatNumber  : Set Number := {x | ∃ n : ℕ, x = n}
 
 notation "∞" => (⊤ : EReal)
+#check -∞
+-- NOTE: does not print like `∞` :(
 
+
+/- Define Limit concept -/
 
 class LimitInput (α' α : Type*) where
   toFilter : α' → Filter α
@@ -98,7 +133,6 @@ instance {X : Type*} [TopologicalSpace X] : LimitOutput X := ⟨X, 𝓝⟩
 
 
 
-
 namespace LimitNoDomain
 
 def myTendsto {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
@@ -127,6 +161,20 @@ variable {Y : Type*} [MetricSpace Y] {a : Y}
 #check myLim (fun y : Y => y) a = a
 #check myLim (fun y : Y => dist y a) a = (0 : Real)
 #check myLim (fun y : Y => 1/(dist y a)) a = ∞
+#check myLim (fun y : Y => 1/(dist y a)) a = (-∞)
+
+variable {b c : Number → Y} {p q : Y} [Add Y]
+#check myLim (fun n => b n + c n) ∞ = p + q
+#check myLim (fun n => b n + c n) ∞ = myLim b ∞ + myLim c ∞
+#check myLim b ∞ + myLim c ∞ = p + q
+
+example : (p + q : Y ??) = (p + q : Y) := by sorry
+
+variable {f g : Number → Number} {u v : Number}
+#check myLim (fun x => f x + g x) (0 : Real) = u + v
+#check_failure myLim (fun x => f x + g x) (0 : Real) = ∞ + v  -- as desired
+-- don't want students to write this
+-- If this would be desired, how to achieve this?
 
 end LimitNoDomain
 
@@ -646,6 +694,10 @@ lemma lim_seq_neginfty_def {a : Number → Number} :
   lim_seq a = (-∞ : EReal) ↔
     ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M := by
   rw [lim_seq_neginfty_def', ← tendsto_seq_neginfty_def]
+
+
+#check Option.map₂
+
 
 
 end Limit
