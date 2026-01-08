@@ -1,100 +1,11 @@
-import Mathlib.Data.Real.Basic
-import Mathlib.Data.EReal.Basic
 import Mathlib.Topology.MetricSpace.Defs
 import Mathlib.Topology.Instances.Real.Lemmas
 
 
-def MaybeUndefined (α : Type*) := Set α
-/- `Set α` instead of `α → Prop` because this gives lots of nice infrastructure for free,
-such as `Set.singleton` and `Set.map2` -/
-
--- notation
-postfix:max "??" => MaybeUndefined
-
-namespace MaybeUndefined
-
-@[ext]
-theorem ext {α : Type*} {P Q : MaybeUndefined α} (h : ∀ x : α, P x ↔ Q x) : P = Q :=
-  funext (fun x ↦ propext (h x))
-
-def mk {α : Type*} (P : α → Prop) : MaybeUndefined α := P
-def of_defined {α : Type*} (x : α) : MaybeUndefined α := Set.singleton x
-
-instance {α : Type*} : Coe α (MaybeUndefined α) where
-  coe := of_defined
+import Abacus.Number
+import Abacus.MaybeUndefined
 
 
-/- Establish key properties of `MaybeUndefined α`
-(theorem names can be improved) -/
-
-lemma satisfies_of_eq_defined {α : Type*} {P : α → Prop} {x : α}
-  (h : mk P = x) : P x := by
-  unfold mk of_defined Set.singleton at h
-  rw [h]
-  rfl
-
-lemma unique_satisfies_of_eq_defined {α : Type*} {P : α → Prop} {x y : α}
-  (h : mk P = x) (hy : P y) : y = x := by
-  unfold mk of_defined Set.singleton at h
-  rwa [h] at hy
-
-lemma eq_defined_of_unique_of_satisfies {α : Type*} {P : α → Prop} {x : α}
-  (hx : P x) (hunique : ∀ {y z}, P y → P z → y = z) : mk P = x := by
-  ext y
-  constructor <;> intro hy
-  · exact hunique hy hx
-  · rwa [hy]
-
-theorem eq_defined_iff_satisfies_of_unique {α : Type*} {P : α → Prop} {x : α}
-  (hunique : ∀ {y z}, P y → P z → y = z) : mk P = x ↔ P x := by
-  constructor <;> intro h
-  · exact satisfies_of_eq_defined h
-  · exact eq_defined_of_unique_of_satisfies h hunique
-
-end MaybeUndefined
-
-
--- /- Establish inherited arithmetic operations -/
--- section MaybeUndefined.Operations
-
-@[to_additive]
-protected def MaybeUndefined.one {α : Type*} [One α] : One (MaybeUndefined α) :=
-  ⟨of_defined 1⟩
-
-attribute [instance] MaybeUndefined.one MaybeUndefined.zero
-
-@[to_additive]
-protected def MaybeUndefined.mul {α : Type*} [Mul α] : Mul (MaybeUndefined α) :=
-  ⟨Set.image2 Mul.mul⟩
-
-attribute [instance] MaybeUndefined.mul MaybeUndefined.add
-
-@[to_additive]
-protected def MaybeUndefined.inv {α : Type*} [Inv α] : Inv (MaybeUndefined α) :=
-  ⟨Set.image Inv.inv⟩
-
-attribute [instance] MaybeUndefined.inv MaybeUndefined.neg
-
-@[to_additive]
-protected def MaybeUndefined.div {α : Type*} [Div α] : Div (MaybeUndefined α) :=
-  ⟨Set.image2 Div.div⟩
-
-attribute [instance] MaybeUndefined.div MaybeUndefined.sub
-
--- TODO add instance (?) that these indeed satisfy the required properties for these rules
--- i.e. that `of_defined '' α` has the same structure as `α`
-
-
-
-notation "Number" => Real
-def RealNumber : Set Number := {x | ∃ r : ℝ, x = r}
-def RatNumber  : Set Number := {x | ∃ q : ℚ, x = q}
-def IntNumber  : Set Number := {x | ∃ z : ℤ, x = z}
-def NatNumber  : Set Number := {x | ∃ n : ℕ, x = n}
-
-notation "∞" => (⊤ : EReal)
-#check -∞
--- NOTE: does not print like `∞` :(
 
 
 /- Define Limit concept -/
@@ -144,9 +55,9 @@ def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
   MaybeUndefined.mk (myTendsto f x₀)
 
 /- Test for the functions `Real → Real` -/
-#check myLim (fun x : Real => 1/x) (0 : Real)
+#check myLim (fun x : Real => 1/x) 0
 #check myLim (fun x : Real => 1/x) ∞
-#check myLim (fun x : Real => 1/x) (0 : EReal)
+#check myLim (fun x : Real => 1/x) 0
 #check_failure myLim (fun x : Real => 1/x) (0 : Nat)
 
 #check myLim (fun x : Real => 1/x) ∞ = (0 : Real)
@@ -161,14 +72,15 @@ variable {Y : Type*} [MetricSpace Y] {a : Y}
 #check myLim (fun y : Y => y) a = a
 #check myLim (fun y : Y => dist y a) a = (0 : Real)
 #check myLim (fun y : Y => 1/(dist y a)) a = ∞
-#check myLim (fun y : Y => 1/(dist y a)) a = (-∞)
+#check myLim (fun y : Y => 1/(dist y a)) a = -∞
 
 variable {b c : Number → Y} {p q : Y} [Add Y]
 #check myLim (fun n => b n + c n) ∞ = p + q
 #check myLim (fun n => b n + c n) ∞ = myLim b ∞ + myLim c ∞
 #check myLim b ∞ + myLim c ∞ = p + q
 
-example : (p + q : Y ??) = (p + q : Y) := by sorry
+example : (p + q : MaybeUndefined Y) = (p + q : Y) := by sorry
+-- check `norm_cast`
 
 variable {f g : Number → Number} {u v : Number}
 #check myLim (fun x => f x + g x) (0 : Real) = u + v
@@ -191,12 +103,12 @@ def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
   MaybeUndefined.mk (myTendsto f D x₀)
 
 /- Test for the functions `Real → Real` -/
-#check myLim (fun x : Real => 1/x) RealNumber (0 : Real)
+#check myLim (fun x : Real => 1/x) RealNumber 0
 #check myLim (fun x : Real => 1/x) NatNumber ∞
 
 #check myLim (fun x : Real => 1/x) RealNumber ∞ = (0 : Real)
 #check myLim (fun x : Real => 1/x) NatNumber (2 : Real) = (0.5 : Real)
-
+#check myLim (fun x : Real => 1/x) NatNumber (2 : Real) = -∞
 
 def lim_seq {β : Type*} [LimitOutput β] (a : Number → β) :
   MaybeUndefined (LimitOutput.points β) := MaybeUndefined.mk (myTendsto a NatNumber ∞)
@@ -239,6 +151,7 @@ lemma myTendsto_pt_neginfty_def {X : Type*} [MetricSpace X]
 
 /- Input `x → ∞` -/
 
+-- TODO: look for these equivalences in mathlib
 lemma myTendsto_infty_pt_def {Y : Type*} [MetricSpace Y]
   {f : Number → Y} {D : Set Number} {y₀ : Y} :
   myTendsto f D ∞ y₀ ↔
@@ -610,7 +523,7 @@ lemma myLim_pt_nr_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Number} :
   myLim f D x₀ = y₀ ↔
     ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε := by
-  rw [myLim_pt_nr_def' hx₀, ← myTendsto_pt_pt_def]
+  rw [myLim_pt_nr_def' hx₀, ← myTendsto_pt_nr_def]
 
 lemma myLim_pt_infty_def {X : Type*} [MetricSpace X]
   {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
