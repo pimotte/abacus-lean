@@ -645,6 +645,10 @@ lemma limseq_neq_neginfty_metricSpace {β : Type*} [MetricSpace β] [Nontrivial 
   {a : Number → β} : lim_seq a ≠ MaybeUndefined.of_def -∞ := by
   apply myLim_neq_output_neginfty_metricSpace
 
+-- TODO: maybe `Nontrivial β` requirement can be removed for `myLim` and `lim_seq`
+-- reason: if `β` has only one term, both `-∞` and `∞` will be valid limit points,
+--   hence the limit is ill-defined
+
 end Impossible
 
 
