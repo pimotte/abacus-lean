@@ -1,11 +1,10 @@
 # Notes for formalization
 
 
-## Useful def/thm/class
+## Useful def/thm/class/stuff
 
-- `Unique`, inhabited and unique 
-- `Set.Subsingleton` hprop, at most one element
-- `Unique.subsingleton_unique'` the type `Unique a` is a subsingleton
-- `ExistsUnique` predicate, denoted by `∃!`
+https://lean-lang.org/doc/reference/latest/Type-Classes/Instance-Declarations/#instance-priorities
 
+## Questions
 
+- Are coercions used in type class inference?

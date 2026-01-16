@@ -8,8 +8,6 @@ def RatNumber  : Set Number := {x | ∃ q : Rat,  x = q}
 def IntNumber  : Set Number := {x | ∃ z : Int,  x = z}
 def NatNumber  : Set Number := {x | ∃ n : Nat,  x = n}
 
-#check Int.ofNat
-
 -- notation (priority := high) "ℝ" => RealNumber   -- `(priority := high)` from Yalep
 -- notation (priority := high) "ℚ" => RatNumber
 -- notation (priority := high) "ℤ" => IntNumber
@@ -18,12 +16,14 @@ def NatNumber  : Set Number := {x | ∃ n : Nat,  x = n}
 example (n : Number) := n ∈ NatNumber
 
 /- Notation for infinities when they pop up. -/
-notation "[-∞,∞]" => EReal
+notation "[-∞,∞]" => WithBot (WithTop Number)
 
-notation "∞" => (⊤ : EReal)
+notation "∞" => Top.top
+notation "-∞" => Bot.bot
+
 #check ∞
 #check -∞
--- NOTE: does not print like `∞` or `-∞` :(
+
 
 
 

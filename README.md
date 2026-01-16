@@ -13,7 +13,9 @@ Formal math library designed to facilitate the use of proof assistants in first-
 
   Allows for using limits in chains of equalities, like
   
-  > `lim n, (a n + b n) = (lim n, a n) + (lim n, b n) = p + q`
+  ```
+  lim n, (a n + b n) = (lim n, a n) + (lim n, b n) = p + q
+  ```
 
   given that `(lim n, a n) = p` and `(lim n, b n) = q`
 

@@ -1,170 +1,290 @@
 import Mathlib.Topology.MetricSpace.Defs
 import Mathlib.Topology.Instances.Real.Lemmas
 
-
 import Abacus.Number
 import Abacus.MaybeUndefined
 
 
+section DiscreteOrder   -- TODO: turn into module?
+                        -- At least something that needs to be opened explicitly
 
+/- Define a discrete order on metric spaces such that these can be used
+with the new limit concept -/
 
-/- Define Limit concept -/
+instance (priority := low) discreteOrder (α : Type*) [MetricSpace α] : PartialOrder α where
+  /- limit to `MetricSpace` to prevent spread of this trivial order by means of type inference -/
+  le := Eq
+  le_refl := Eq.refl
+  le_trans := @Eq.trans α
+  le_antisymm := fun a b p _ ↦ p
 
-class LimitInput (α' α : Type*) where
-  toFilter : α' → Filter α
+/- Interaction topology with a discrete order -/
 
-class LimitOutput (β : Type*) where
-  points : Type*
-  toFilter : points → Filter β
+instance {α : Type*} [MetricSpace α] [Nontrivial α] : @NoTopOrder α (discreteOrder α).toLE where
+  exists_not_le (a : α) := by
+    simp only [LE.le]
+    rwa [← nontrivial_iff_exists_ne a]
 
+instance {α : Type*} [MetricSpace α] [Nontrivial α] : @NoBotOrder α (discreteOrder α).toLE where
+  exists_not_ge (a : α) := by
+    simp only [LE.le]
+    have : ∃ b, ¬b = a := by rwa [← nontrivial_iff_exists_ne a]
+    obtain ⟨b, h⟩ := this
+    exact ⟨b, fun heq ↦ h heq.symm⟩ -- should be a simpler way to transform `a ≠ b` into `b ≠ a`
 
-open Topology
+instance {α : Type*} [MetricSpace α] : @ClosedIicTopology α _ (discreteOrder α).toPreorder where
+  isClosed_Iic (a : α) := by apply isClosed_singleton
 
-/- Instances for functions in the Reals, or Real-valued functions -/
-instance : LimitInput EReal Real where
-  toFilter
-    | none           => Filter.atBot
-    | some none      => Filter.atTop
-    | some (some x') => 𝓝[≠] x'
+instance {α : Type*} [MetricSpace α] : @ClosedIciTopology α _ (discreteOrder α).toPreorder where
+  isClosed_Ici (a : α) := by
+    have : Set.Ici a = {a} := by
+      ext b
+      simp only [Set.mem_Ici, Set.mem_singleton_iff]
+      rw [Eq.comm]; rfl
+    rw [this]
+    apply isClosed_singleton
 
-instance (priority := high) : LimitOutput Real where
-  points := EReal
-  toFilter
-    | none           => Filter.atBot
-    | some none      => Filter.atTop
-    | some (some x') => 𝓝 x'
-
-instance : Coe Number (LimitOutput.points Number) where
-  coe := Real.toEReal
-
-/- Instances for topological spaces in general -/
-instance {X : Type*} [TopologicalSpace X] : LimitInput X X := ⟨fun x => 𝓝[≠] x⟩
-
-instance {X : Type*} [TopologicalSpace X] : LimitOutput X := ⟨X, 𝓝⟩
-
-
-
-namespace LimitNoDomain
-
-def myTendsto {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
-  (f : α → β) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
-    Filter.Tendsto f (LimitInput.toFilter x₀) (LimitOutput.toFilter y₀)
-
-def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
-  (f : α → β) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
-  MaybeUndefined.mk (myTendsto f x₀)
-
-/- Test for the functions `Real → Real` -/
-#check myLim (fun x : Real => 1/x) 0
-#check myLim (fun x : Real => 1/x) ∞
-#check myLim (fun x : Real => 1/x) 0
-#check_failure myLim (fun x : Real => 1/x) (0 : Nat)
-
-#check myLim (fun x : Real => 1/x) ∞ = (0 : Real)
-#check myLim (fun x : Real => 1/x) (2 : Real) = (0.5 : Real)
-
-
-/- Test for functions to and from generic metric spaces -/
-variable {Y : Type*} [MetricSpace Y] {a : Y}
-
-#check myLim (fun y : Y => y) a
-#check_failure myLim (fun y : Y => y) (0 : Real)
-#check myLim (fun y : Y => y) a = a
-#check myLim (fun y : Y => dist y a) a = (0 : Real)
-#check myLim (fun y : Y => 1/(dist y a)) a = ∞
-#check myLim (fun y : Y => 1/(dist y a)) a = -∞
-
-variable {b c : Number → Y} {p q : Y} [Add Y]
-#check myLim (fun n => b n + c n) ∞ = p + q
-#check myLim (fun n => b n + c n) ∞ = myLim b ∞ + myLim c ∞
-#check myLim b ∞ + myLim c ∞ = p + q
-
-example : (p + q : MaybeUndefined Y) = (p + q : Y) := by sorry
--- check `norm_cast`
-
-variable {f g : Number → Number} {u v : Number}
-#check myLim (fun x => f x + g x) (0 : Real) = u + v
-#check_failure myLim (fun x => f x + g x) (0 : Real) = ∞ + v  -- as desired
--- don't want students to write this
--- If this would be desired, how to achieve this?
-
-end LimitNoDomain
+end DiscreteOrder
 
 
 
 namespace Limit
 
-def myTendsto {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
-  (f : α → β) (D : Set α) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
-    Filter.Tendsto f (LimitInput.toFilter x₀ ⊓ Filter.principal D) (LimitOutput.toFilter y₀)
+open Filter Topology
 
-def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
-  (f : α → β) (D : Set α) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
+def input_filter {α : Type*} [TopologicalSpace α] [Preorder α]
+  (D : Set α) (x₀ : WithBot (WithTop α)) : Filter α :=
+  match x₀ with
+  | none            => atBot ⊓ 𝓟 D
+  | some none       => atTop ⊓ 𝓟 D
+  | some (some x₀)  => 𝓝[≠] x₀ ⊓ 𝓟 D
+
+def output_filter {α : Type*} [TopologicalSpace α] [Preorder α]
+  (y₀ : WithBot (WithTop α)) : Filter α :=
+  match y₀ with
+  | none            => atBot
+  | some none       => atTop
+  | some (some y₀)  => 𝓝 y₀
+
+def myTendsto {α β : Type*} [TopologicalSpace α] [Preorder α] [TopologicalSpace β] [Preorder β]
+  (f : α → β) (D : Set α) (x₀ : WithBot (WithTop α)) (y₀ : WithBot (WithTop β)) : Prop :=
+  Filter.Tendsto f (input_filter D x₀) (output_filter y₀)
+
+def myLim {α β : Type*} [TopologicalSpace α] [Preorder α] [TopologicalSpace β] [Preorder β]
+  (f : α → β) (D : Set α) (x₀ : WithBot (WithTop α)) : MaybeUndefined (WithBot (WithTop β)) :=
   MaybeUndefined.mk (myTendsto f D x₀)
 
-/- Test for the functions `Real → Real` -/
-#check myLim (fun x : Real => 1/x) RealNumber 0
-#check myLim (fun x : Real => 1/x) NatNumber ∞
-
-#check myLim (fun x : Real => 1/x) RealNumber ∞ = (0 : Real)
-#check myLim (fun x : Real => 1/x) NatNumber (2 : Real) = (0.5 : Real)
-#check myLim (fun x : Real => 1/x) NatNumber (2 : Real) = -∞
-
-def lim_seq {β : Type*} [LimitOutput β] (a : Number → β) :
-  MaybeUndefined (LimitOutput.points β) := MaybeUndefined.mk (myTendsto a NatNumber ∞)
+def lim_seq {β : Type*} [TopologicalSpace β] [Preorder β] (seq : Number → β) :
+  MaybeUndefined (WithBot (WithTop β)) := MaybeUndefined.mk (myTendsto seq NatNumber ∞)
 
 
+/- Test limit inputs -/
 
-/- Rewrite `myTendsTo` and `tendsto_seq` to **all the** familiar definitions from analysis
-for metric spaces -/
+section Test
 
-open Filter
+#check myLim (fun x : Number => 1/x) RealNumber 0
+#check myLim (fun x : Real => 1/x) RealNumber 2 = (1/2 : Real)
+#check myLim (fun x : Real => 1/x) RealNumber 0 = MaybeUndefined.of_def ∞
+#check myLim (fun x : Real => 1/x) RealNumber 0 = MaybeUndefined.of_def -∞
+#check myLim (fun x : Real => 1/x) RealNumber ∞ = MaybeUndefined.of_def 0
+#check myLim (fun x : Real => 1/x) RealNumber -∞ = MaybeUndefined.of_def 0
+
+variable {Y : Type*} [MetricSpace Y] {a : Y}
+
+#check myLim (fun y : Y => y) Set.univ a
+#check_failure myLim (fun y : Y => y) Set.univ 0
+#check myLim (fun y : Y => y) Set.univ a = a
+#check myLim (fun y : Y => y) Set.univ ∞ = a
+#check myLim (fun y : Y => dist y a) Set.univ a = MaybeUndefined.of_def 0
+#check myLim (fun y : Y => 1/(dist y a)) Set.univ a = MaybeUndefined.of_def ∞
+#check myLim (fun y : Y => 1/(dist y a)) Set.univ a = MaybeUndefined.of_def -∞
+
+end Test
 
 
-/- Definitions for general convergence of functions, i.e. `myTendsTo`-/
+
+
+-- namespace LimitNoDomain
+
+-- def myTendsto {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
+--   (f : α → β) (x₀ : α') (y₀ : LimitOutput.points β) : Prop :=
+--     Filter.Tendsto f (LimitInput.toFilter x₀) (LimitOutput.toFilter y₀)
+
+-- def myLim {α α' β : Type*} [LimitInput α' α] [LimitOutput β]
+--   (f : α → β) (x₀ : α') : MaybeUndefined (LimitOutput.points β) :=
+--   MaybeUndefined.mk (myTendsto f x₀)
+
+-- /- Test for the functions `Real → Real` -/
+-- #check myLim (fun x : Real => 1/x) 0
+-- #check myLim (fun x : Real => 1/x) ∞
+-- #check myLim (fun x : Real => 1/x) 0
+-- #check_failure myLim (fun x : Real => 1/x) (0 : Nat)
+
+-- #check myLim (fun x : Real => 1/x) ∞ = 0
+-- #check myLim (fun x : Real => 1/x) (2 : Real) = (0.5 : Real)
+
+
+-- /- Test for functions to and from generic metric spaces -/
+-- variable {Y : Type*} [MetricSpace Y] {a : Y}
+
+-- #check myLim (fun y : Y => y) a
+-- #check_failure myLim (fun y : Y => y) (0 : Real)
+-- #check myLim (fun y : Y => y) a = a
+-- #check myLim (fun y : Y => dist y a) a = (0 : Real)
+-- #check myLim (fun y : Y => 1/(dist y a)) a = ∞
+-- #check myLim (fun y : Y => 1/(dist y a)) a = -∞
+
+-- variable {b c : Number → Y} {p q : Y} [Add Y]
+-- #check myLim (fun n => b n + c n) ∞ = p + q
+-- #check myLim (fun n => b n + c n) ∞ = myLim b ∞ + myLim c ∞
+-- #check myLim b ∞ + myLim c ∞ = p + q
+
+-- example : (p + q : MaybeUndefined Y) = (p + q : Y) := by sorry
+-- -- check `norm_cast`
+
+-- variable {f g : Number → Number} {u v : Number}
+-- #check myLim (fun x => f x + g x) (0 : Real) = u + v
+-- #check_failure myLim (fun x => f x + g x) (0 : Real) = ∞ + v  -- as desired
+-- -- don't want students to write this
+-- -- If this would be desired, how to achieve this?
+
+-- end LimitNoDomain
+
+
+section Uniqueness
+
+/- At most one limit point -/
+
+/- Uniqueness of output for any non-trivial input filter -/
+
+lemma aux_unique_withbottop {α : Type*} (P : WithBot (WithTop α) → Prop) (notTopBot : ¬ (P ⊤ ∧ P ⊥))
+  (notValTop : ∀ x : α, ¬ (P x ∧ P ⊤)) (notValBot : ∀ x : α, ¬ (P x ∧ P ⊥))
+  (valUnique : ∀ x y : α, P x → P y → x = y) :
+  ∀ u v : WithBot (WithTop α), P u → P v → u = v :=
+  by
+  simp [WithBot.forall, WithTop.forall]
+  repeat
+    and_intros
+    tauto
+    intro
+  apply valUnique
+
+lemma myTendsto_unique {α β : Type*} [TopologicalSpace α] [Preorder α]
+  [TopologicalSpace β] [T2Space β] [Nontrivial β] [PartialOrder β] [NoTopOrder β] [NoBotOrder β]
+  [ClosedIciTopology β] [ClosedIicTopology β]
+  {f : α → β} {D : Set α} {x₀ : WithBot (WithTop α)} (hIn : NeBot (input_filter D x₀))
+  {y₁ y₂ : WithBot (WithTop β)} (h₁ : myTendsto f D x₀ y₁) (h₂ : myTendsto f D x₀ y₂) : y₁ = y₂ :=
+  by
+  apply aux_unique_withbottop (myTendsto f D x₀) _ _ _ _ _ _ h₁ h₂
+  · /- Cannot go to both `∞` and `-∞` -/
+    simp only [not_and]; intro h_infty
+    apply Tendsto.not_tendsto h_infty
+    simp only [output_filter]
+    apply Filter.disjoint_atTop_atBot
+  · /- Cannot go to both `y : β` and `∞` -/
+    intro y; simp only [not_and]; intro h
+    apply not_tendsto_atTop_of_tendsto_nhds h
+  · /- Cannot go to both `y : β` and `-∞` -/
+    intro y; simp only [not_and]; intro h
+    apply not_tendsto_atBot_of_tendsto_nhds h
+  · /- Cannot go to two values `y₁ : β` and `y₂ : β` at once -/
+    intro y₁ y₂ h₁ h₂
+    apply tendsto_nhds_unique h₁ h₂
+
+
+/- Conditions on domain `D` for which input filter is non-trivial -/
+
+def AccPts {X : Type*} [TopologicalSpace X] (D : Set X) : Set X := {x | AccPt x (𝓟 D)}
+
+lemma neBot_inputFilter_pt_iff_accPt {X : Type*} [TopologicalSpace X] [Preorder X]
+  {D : Set X} {x₀ : X} :
+  NeBot (input_filter D x₀)  ↔  x₀ ∈ AccPts D := by rfl
+
+lemma neBot_inputFilter_infty_iff_notBddAbove {D : Set Number} :
+  NeBot (input_filter D ∞) ↔ ¬BddAbove D := by
+  simp only [input_filter]
+  rw [inf_principal_neBot_iff]
+  simp only [mem_atTop_sets]
+  rw [not_bddAbove_iff]
+  constructor <;> intro h
+  · intro x
+    have hU : ∃ y, ∀ z ≥ y, z ∈ {z' | z' ≥ x + 1} := by
+      use x + 1, fun _ h' => h'
+    obtain ⟨y, ⟨hy, yinD⟩⟩ := h _ hU
+    use y, yinD
+    exact lt_of_lt_of_le (lt_add_one x) hy
+  · intro U hU
+    obtain ⟨z, hz⟩ := hU
+    obtain ⟨x, xinD, zltx⟩ := h z
+    use x, hz _ (le_of_lt zltx)
+
+lemma neBot_inputFilter_neginfty_iff_notBddBelow {D : Set Number} :
+  NeBot (input_filter D -∞) ↔ ¬BddBelow D := by
+  simp only [input_filter]
+  rw [inf_principal_neBot_iff]
+  simp only [mem_atBot_sets]
+  rw [not_bddBelow_iff]
+  constructor <;> intro h
+  · intro x
+    have hU : ∃ y, ∀ z ≤ y, z ∈ {z' | z' + 1 ≤ x} := by
+      use x - 1
+      intro z zlexneg1
+      simp; trans (x - 1 + 1)
+      · rwa [add_le_add_iff_right]
+      · rw [sub_add_cancel x]
+    obtain ⟨y, ⟨hy, yinD⟩⟩ := h _ hU
+    use y, yinD
+    exact lt_of_lt_of_le (lt_add_one y) hy
+  · intro U hU
+    obtain ⟨z, hz⟩ := hU
+    obtain ⟨x, xinD, zltx⟩ := h z
+    use x, hz _ (le_of_lt zltx)
+
+end Uniqueness
+
+
+
+section Characterizations
+
+/- Characterizations of `myTendsto` into familiar definition -/
+-- TODO: look for these equivalences in mathlib
 
 /- Input `x → x₀` -/
 
-lemma myTendsto_pt_pt_def {X Y : Type*} [MetricSpace X] [MetricSpace Y]
-  {f : X → Y} {D : Set X} {x₀ : X} {y₀ : Y} :
-  myTendsto f D x₀ y₀ ↔
-    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε
-  := sorry
+lemma myTendsto_pt_pt_def {α β : Type*} [MetricSpace α] [Preorder α] [MetricSpace β] [Preorder β]
+  {f : α → β} {D : Set α} {x₀ : α} {y₀ : β} :
+  myTendsto f D x₀ y₀
+    ↔  ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε :=
+  by
+  sorry
 
-lemma myTendsto_pt_nr_def {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} {y₀ : Number} :
-  myTendsto f D x₀ y₀ ↔
-    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε
-  := sorry
+lemma myTendsto_pt_infty_def {α : Type*} [MetricSpace α] [Preorder α]
+  {f : α → Number} {D : Set α} {x₀ : α} :
+  myTendsto f D x₀ ∞
+    ↔  ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M :=
+  by
+  sorry
 
-lemma myTendsto_pt_infty_def {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} :
-  myTendsto f D x₀ ∞ ↔
-    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M
-  := sorry
-
-lemma myTendsto_pt_neginfty_def {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} :
-  myTendsto f D x₀ (-∞) ↔
-    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M
-  := sorry
+lemma myTendsto_pt_neginfty_def {α : Type*} [MetricSpace α] [Preorder α]
+  {f : α → Number} {D : Set α} {x₀ : α} :
+  myTendsto f D x₀ -∞
+    ↔  ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M :=
+  by
+  sorry
 
 /- Input `x → ∞` -/
 
--- TODO: look for these equivalences in mathlib
-lemma myTendsto_infty_pt_def {Y : Type*} [MetricSpace Y]
-  {f : Number → Y} {D : Set Number} {y₀ : Y} :
-  myTendsto f D ∞ y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε :=
+lemma myTendsto_infty_pt_def {β : Type*} [MetricSpace β] [Preorder β]
+  {f : Number → β} {D : Set Number} {y₀ : β} :
+  myTendsto f D ∞ y₀  ↔  ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε :=
   by
-  have h_tendsto : myTendsto f D (⊤ : EReal) y₀ ↔ Tendsto f (atTop ⊓ 𝓟 D) (nhds y₀) := by rfl
-  rw [h_tendsto]
+  simp only [myTendsto, input_filter, output_filter]
   rw [Metric.tendsto_nhds]
   simp only [Filter.eventually_iff]
   constructor <;> intro h ε εpos
   · simp only [Filter.mem_inf_iff] at h
     obtain ⟨u, hu, s, hs, heq⟩ := h ε εpos
-    simp only [mem_atTop_sets] at hu
+    rw [mem_atTop_sets] at hu
     obtain ⟨z, hz⟩ := hu
     simp [Set.ext_iff] at heq; simp only [heq]
     use z
@@ -178,50 +298,39 @@ lemma myTendsto_infty_pt_def {Y : Type*} [MetricSpace Y]
     · apply mem_atTop
     · apply Filter.mem_principal_self
 
-lemma myTendsto_infty_nr_def {f : Number → Number} {D : Set Number} {y₀ : Number} :
-  myTendsto f D ∞ y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε
-  := sorry
-
 lemma myTendsto_infty_infty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D ∞ ∞ ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M
-  := sorry
+  myTendsto f D ∞ ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M :=
+  by
+  sorry
 
 lemma myTendsto_infty_neginfty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D ∞ (-∞) ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M
-  := sorry
+  myTendsto f D ∞ -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M :=
+  by
+  sorry
 
-/- input `x → -∞`-/
+/- Input `x → -∞` -/
 
-lemma myTendsto_neginfty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
-  {D : Set Number} {y₀ : Y} :
-  myTendsto f D (-∞) y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε
-  := sorry
-
-lemma myTendsto_neginfty_nr_def {f : Number → Number} {D : Set Number} {y₀ : Number} :
-  myTendsto f D (-∞) y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε
-  := sorry
+lemma myTendsto_neginfty_pt_def {β : Type*} [MetricSpace β] [Preorder β]
+  {f : Number → β} {D : Set Number} {y₀ : β} :
+  myTendsto f D -∞ y₀  ↔  ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε :=
+  by
+  sorry
 
 lemma myTendsto_neginfty_infty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D (-∞) ∞ ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M
-  := sorry
+  myTendsto f D -∞ ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M :=
+  by
+  sorry
 
 lemma myTendsto_neginfty_neginfty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D (-∞) (-∞) ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M
-  := sorry
+  myTendsto f D -∞ -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M :=
+  by
+  sorry
 
+/- Characterization of `myTendsto` for sequences into familiar terms -/
 
-
-/- Translation into definitions for convergence of sequences -/
-
-lemma tendsto_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
-  myTendsto a NatNumber ∞ p ↔
+lemma myTendsto_seq_pt_def {β : Type*} [MetricSpace β] [Preorder β]
+  {a : Number → β} {p : β} :
+  myTendsto a NatNumber ∞ p  ↔
     ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε :=
   by
   rw [myTendsto_infty_pt_def]
@@ -237,244 +346,116 @@ lemma tendsto_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} 
     intro n nnat ngtN
     exact hN n nnat (le_of_lt ngtN)
 
-lemma tendsto_seq_nr_def {a : Number → Number} {p : Number} :
-  myTendsto a NatNumber ∞ p ↔
-    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
+lemma myTendsto_seq_infty_def {a : Number → Number} :
+  myTendsto a NatNumber ∞ ∞  ↔  ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n > M :=
+  by
   sorry
 
-lemma tendsto_seq_infty_def {a : Number → Number} :
-  myTendsto a NatNumber ∞ ∞ ↔
-    ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n > M := by
-  sorry
-
-lemma tendsto_seq_neginfty_def {a : Number → Number} :
-  myTendsto a NatNumber ∞ (-∞) ↔
-    ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M := by
+lemma myTendsto_seq_neginfty_def {a : Number → Number} :
+  myTendsto a NatNumber ∞ -∞  ↔  ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M :=
+  by
   sorry
 
 
+/- Characterization of `myLim` in terms of `myTendsto` (for unique limits) -/
 
-
-/- At most one limit point -/
-
-
-/- Uniqueness of output for any non-trivial input filter -/
-
-lemma myTendsto_metric_unique {α α' Y : Type*} [LimitInput α' α] [MetricSpace Y] {f : α → Y}
-  {D : Set α} {x₀ : α'} (hIn : NeBot (LimitInput.toFilter x₀ ⊓ 𝓟 D)) {a b : Y}
-  (ha : myTendsto f D x₀ a) (hb : myTendsto f D x₀ b) : a = b := tendsto_nhds_unique' hIn ha hb
-
-lemma aux_unique_ereal (P : EReal → Prop) (notTopBot : ¬ (P ⊤ ∧ P ⊥))
-  (notRealTop : ∀ x : Real, ¬ (P x ∧ P ⊤)) (notRealBot : ∀ x : Real, ¬ (P x ∧ P ⊥))
-  (realUnique : ∀ x y : Real, P x → P y → x = y) :
-  ∀ u v : EReal, P u → P v → u = v := by
-  simp [EReal.forall]
-  repeat
-    and_intros
-    tauto
-    intro
-  apply realUnique
-
-lemma myTendsto_number_unique {α α' : Type*} [LimitInput α' α] {f : α → Number}
-  {D : Set α} {x₀ : α'} (hIn : NeBot (LimitInput.toFilter x₀ ⊓ 𝓟 D)) {a b : EReal}
-  (ha : myTendsto f D x₀ a) (hb : myTendsto f D x₀ b) : a = b := by
-  apply aux_unique_ereal (myTendsto f D x₀) _ _ _ _ _ _ ha hb
-  · show ¬(myTendsto f D x₀ (⊤ : EReal) ∧ myTendsto f D x₀ (⊥ : EReal))
-    simp only [not_and]; intro hTop
-    apply Tendsto.not_tendsto hTop
-    simp only [LimitOutput.toFilter]
-    apply Filter.disjoint_atTop_atBot
-  · intro a'; simp only [not_and]; intro ha'
-    apply not_tendsto_atTop_of_tendsto_nhds ha'
-  · intro a'; simp only [not_and]; intro ha'
-    apply not_tendsto_atBot_of_tendsto_nhds ha'
-  · intro a' b' ha' hb'
-    apply tendsto_nhds_unique ha' hb'
-
-
-/- Conditions on domain `D` for which input filter is non-trivial -/
-
-def AccPts {X : Type*} [TopologicalSpace X] (D : Set X) : Set X := {x | AccPt x (𝓟 D)}
-
-lemma neBot_inputLimit_pt_iff_accPt {X : Type*} [MetricSpace X] {D : Set X} {x₀ : X} :
-  x₀ ∈ AccPts D ↔ NeBot (LimitInput.toFilter x₀ ⊓ 𝓟 D) := by
-  rfl
-
-lemma neBot_inputLimit_infty_iff_notBddAbove {D : Set Number} :
-  ¬BddAbove D ↔ NeBot (LimitInput.toFilter ∞ ⊓ 𝓟 D) := by
-  simp only [LimitInput.toFilter]
-  rw [inf_principal_neBot_iff]
-  simp only [mem_atTop_sets]
-  rw [not_bddAbove_iff]
-  constructor <;> intro h
-  · intro U hU
-    obtain ⟨z, hz⟩ := hU
-    obtain ⟨x, xinD, zltx⟩ := h z
-    use x, hz _ (le_of_lt zltx)
-  · intro x
-    have hU : ∃ y, ∀ z ≥ y, z ∈ {z' | z' ≥ x + 1} := by
-      use x + 1, fun _ h' => h'
-    obtain ⟨y, ⟨hy, yinD⟩⟩ := h _ hU
-    use y, yinD
-    exact lt_of_lt_of_le (lt_add_one x) hy
-
-lemma neBot_inputLimit_neginfty_iff_notBddBelow {D : Set Number} :
-  ¬BddBelow D ↔ NeBot (LimitInput.toFilter (-∞) ⊓ 𝓟 D) := by
-  simp only [EReal.neg_top]
-  simp only [LimitInput.toFilter]
-  rw [inf_principal_neBot_iff]
-  simp only [mem_atBot_sets]
-  rw [not_bddBelow_iff]
-  constructor <;> intro h
-  · intro U hU
-    obtain ⟨z, hz⟩ := hU
-    obtain ⟨x, xinD, zltx⟩ := h z
-    use x, hz _ (le_of_lt zltx)
-  · intro x
-    have hU : ∃ y, ∀ z ≤ y, z ∈ {z' | z' + 1 ≤ x} := by
-      use x - 1
-      intro z zlexneg1
-      simp; trans (x - 1 + 1)
-      · rwa [add_le_add_iff_right]
-      · rw [sub_add_cancel x]
-    obtain ⟨y, ⟨hy, yinD⟩⟩ := h _ hU
-    use y, yinD
-    exact lt_of_lt_of_le (lt_add_one y) hy
-
-
-/- Uniqueness of output given familiar conditions -/
-
-/- Output in general metric space -/
-
-lemma myTendsto_pt_pt_unique {X Y : Type*} [MetricSpace X] [MetricSpace Y] {f : X → Y}
-  {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {a b : Y}
-  (ha : myTendsto f D x₀ a) (hb : myTendsto f D x₀ b) : a = b := by
-  apply myTendsto_metric_unique _ ha hb
-  apply neBot_inputLimit_pt_iff_accPt.mp
-  exact hx₀
-
-lemma myTendsto_infty_pt_unique {Y : Type*} [MetricSpace Y] {f : Number → Y}
-  {D : Set Number} (hD : ¬BddAbove D) {a b : Y}
-  (ha : myTendsto f D ∞ a) (hb : myTendsto f D ∞ b) : a = b := by
-  apply myTendsto_metric_unique _ ha hb
-  exact neBot_inputLimit_infty_iff_notBddAbove.mp hD
-
-lemma myTendsto_neginfty_pt_unique {Y : Type*} [MetricSpace Y] {f : Number → Y}
-  {D : Set Number} (hD : ¬BddBelow D) {a b : Y}
-  (ha : myTendsto f D (-∞) a) (hb : myTendsto f D (-∞) b) : a = b := by
-  apply myTendsto_metric_unique _ ha hb
-  exact neBot_inputLimit_neginfty_iff_notBddBelow.mp hD
-
-/- Output in `Number` -/
-
-lemma myTendsto_pt_nr_unique {X : Type*} [MetricSpace X] {f : X → Number}
-  {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {a b : EReal}
-  (ha : myTendsto f D x₀ a) (hb : myTendsto f D x₀ b) : a = b := by
-  apply myTendsto_number_unique _ ha hb
-  exact neBot_inputLimit_pt_iff_accPt.mp hx₀
-
-lemma myTendsto_infty_nr_unique {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D)
-  {a b : EReal} (ha : myTendsto f D ∞ a) (hb : myTendsto f D ∞ b) :
-  a = b := by
-  apply myTendsto_number_unique _ ha hb
-  exact neBot_inputLimit_infty_iff_notBddAbove.mp hD
-
-lemma myTendsto_neginfty_nr_unique {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D)
-  {a b : EReal} (ha : myTendsto f D (-∞) a) (hb : myTendsto f D (-∞) b) :
-  a = b := by
-  apply myTendsto_number_unique _ ha hb
-  exact neBot_inputLimit_neginfty_iff_notBddBelow.mp hD
-
-
-/- Characterization of limits in terms of `myTendsto` -/
-
-/- Functions -/
-
-lemma myLim_pt_pt_def' {X Y : Type*} [MetricSpace X] [MetricSpace Y]
-  {f : X → Y} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Y} :
-  myLim f D x₀ = y₀ ↔ myTendsto f D x₀ y₀ := by
+lemma myLim_iff_myTendsto {α β : Type*} [TopologicalSpace α] [Preorder α]
+  [TopologicalSpace β] [T2Space β] [Nontrivial β] [PartialOrder β] [NoTopOrder β] [NoBotOrder β]
+  [ClosedIciTopology β] [ClosedIicTopology β]
+  {f : α → β} {D : Set α} {x₀ : WithBot (WithTop α)} (hIn : NeBot (input_filter D x₀))
+  {y₀ : WithBot (WithTop β)} :
+    myLim f D x₀ = y₀  ↔  myTendsto f D x₀ y₀ :=
+  by
   apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
   intro y₁ y₂
-  apply myTendsto_pt_pt_unique hx₀
+  apply myTendsto_unique hIn
 
-lemma myLim_pt_nr_def' {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Number} :
-  myLim f D x₀ = y₀ ↔ myTendsto f D x₀ y₀ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_pt_nr_unique hx₀
+/- Characterization of `myLim` in familiar terms -/
 
-lemma myLim_pt_infty_def' {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
-  myLim f D x₀ = ∞ ↔ myTendsto f D x₀ ∞ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_pt_nr_unique hx₀
+/- Input `x → x₀` -/
 
-lemma myLim_pt_neginfty_def' {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
-  myLim f D x₀ = (-∞ : EReal) ↔ -- TODO fix parsing of notation `-∞` as coercion to `EReal ??`
-    myTendsto f D x₀ (-∞) := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_pt_nr_unique hx₀
+lemma myLim_pt_pt_def {α β : Type*} [MetricSpace α] [Preorder α]
+  [MetricSpace β] [Nontrivial β] [PartialOrder β] [NoTopOrder β] [NoBotOrder β]
+  [ClosedIciTopology β] [ClosedIicTopology β]
+  {f : α → β} {D : Set α} {x₀ : α} (hx₀ : x₀ ∈ AccPts D) {y₀ : β} :
+  myLim f D x₀ = y₀
+    ↔  ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε :=
+  by
+  rw [← myTendsto_pt_pt_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_pt_iff_accPt.mpr hx₀
+
+lemma myLim_pt_infty_def {α : Type*} [MetricSpace α] [Preorder α]
+  {f : α → Number} {D : Set α} {x₀ : α} (hx₀ : x₀ ∈ AccPts D) :
+  myLim f D x₀ = MaybeUndefined.of_def ∞
+    ↔  ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M :=
+  by
+  rw [← myTendsto_pt_infty_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_pt_iff_accPt.mpr hx₀
+
+lemma myLim_pt_neginfty_def {α : Type*} [MetricSpace α] [Preorder α]
+  {f : α → Number} {D : Set α} {x₀ : α} (hx₀ : x₀ ∈ AccPts D) :
+  myLim f D x₀ = MaybeUndefined.of_def -∞
+    ↔  ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M :=
+  by
+  rw [← myTendsto_pt_neginfty_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_pt_iff_accPt.mpr hx₀
 
 /- Input `x → ∞` -/
 
-lemma myLim_infty_pt_def' {Y : Type*} [MetricSpace Y] {f : Number → Y}
-  {D : Set Number} (hD : ¬BddAbove D) {y₀ : Y} :
-  myLim f D ∞ = y₀ ↔ myTendsto f D ∞ y₀ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_pt_unique hD
+lemma myLim_infty_pt_def {β : Type*} [MetricSpace β] [Nontrivial β]
+  [PartialOrder β] [NoTopOrder β] [NoBotOrder β]
+  [ClosedIciTopology β] [ClosedIicTopology β]
+  {f : Number → β} {D : Set Number} (hD : ¬BddAbove D) {y₀ : β} :
+  myLim f D ∞ = y₀  ↔  ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε :=
+  by
+  rw [← myTendsto_infty_pt_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_infty_iff_notBddAbove.mpr hD
 
-lemma myLim_infty_nr_def' {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) {y₀ : Number} :
-  myLim f D ∞ = y₀ ↔ myTendsto f D ∞ y₀ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_nr_unique hD
+lemma myLim_infty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
+  myLim f D ∞ = MaybeUndefined.of_def ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M :=
+  by
+  rw [← myTendsto_infty_infty_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_infty_iff_notBddAbove.mpr hD
 
-lemma myLim_infty_infty_def' {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D ∞ = ∞ ↔ myTendsto f D ∞ ∞ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_nr_unique hD
-
-lemma myLim_infty_neginfty_def' {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D ∞ = (-∞ : EReal) ↔ myTendsto f D ∞ (-∞):= by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_nr_unique hD
+lemma myLim_infty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
+  myLim f D ∞ = MaybeUndefined.of_def -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M :=
+  by
+  rw [← myTendsto_infty_neginfty_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_infty_iff_notBddAbove.mpr hD
 
 /- input `x → -∞`-/
 
-lemma myLim_neginfty_pt_def' {Y : Type*} [MetricSpace Y] {f : Number → Y}
-  {D : Set Number} (hD : ¬BddBelow D) {y₀ : Y} :
-  myLim f D (-∞) = y₀ ↔ myTendsto f D (-∞) y₀ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_neginfty_pt_unique hD
+lemma myLim_neginfty_pt_def {β : Type*} [MetricSpace β] [Nontrivial β]
+  [PartialOrder β] [NoTopOrder β] [NoBotOrder β]
+  [ClosedIciTopology β] [ClosedIicTopology β]
+  {f : Number → β} {D : Set Number} (hD : ¬BddBelow D) {y₀ : β} :
+  myLim f D -∞ = y₀  ↔  ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε :=
+  by
+  rw [← myTendsto_neginfty_pt_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_neginfty_iff_notBddBelow.mpr hD
 
-lemma myLim_neginfty_nr_def' {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D)
-  {y₀ : Number} : myLim f D (-∞) = y₀ ↔ myTendsto f D (-∞) y₀ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_neginfty_nr_unique hD
+lemma myLim_neginfty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
+  myLim f D -∞ = MaybeUndefined.of_def ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M :=
+  by
+  rw [← myTendsto_neginfty_infty_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_neginfty_iff_notBddBelow.mpr hD
 
-lemma myLim_neginfty_infty_def' {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D (-∞) = ∞ ↔ myTendsto f D (-∞) ∞ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_neginfty_nr_unique hD
+lemma myLim_neginfty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
+  myLim f D -∞ = MaybeUndefined.of_def -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M :=
+  by
+  rw [← myTendsto_neginfty_neginfty_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_neginfty_iff_notBddBelow.mpr hD
 
-lemma myLim_neginfty_neginfty_def' {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D (-∞) = (-∞ : EReal) ↔ myTendsto f D (-∞) (-∞) := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_neginfty_nr_unique hD
-
-
-/- Characterization of limits of sequences -/
+/- Characterization of `lim_seq` in familiar terms -/
 
 lemma notBddAbove_natNumber : ¬BddAbove NatNumber := by
   rw [not_bddAbove_iff]
@@ -482,135 +463,196 @@ lemma notBddAbove_natNumber : ¬BddAbove NatNumber := by
   obtain ⟨N, _⟩ := exists_nat_gt x
   use N, ⟨N, rfl⟩
 
-lemma lim_seq_pt_def' {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
-  lim_seq a = p ↔ myTendsto a NatNumber ∞ p := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_pt_unique notBddAbove_natNumber
-
-lemma lim_seq_nr_def' {a : Number → Number} {p : Number} :
-  lim_seq a = p ↔ myTendsto a NatNumber ∞ p := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_nr_unique notBddAbove_natNumber
-
-lemma lim_seq_infty_def' {a : Number → Number} :
-  lim_seq a = ∞ ↔ myTendsto a NatNumber ∞ ∞ := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_nr_unique notBddAbove_natNumber
-
-lemma lim_seq_neginfty_def' {a : Number → Number} :
-  lim_seq a = (-∞ : EReal) ↔ myTendsto a NatNumber ∞ (-∞) := by
-  apply MaybeUndefined.eq_defined_iff_satisfies_of_unique
-  intro y₁ y₂
-  apply myTendsto_infty_nr_unique notBddAbove_natNumber
-
-
-/- Characterization of limits in familiar terms -/
-
-/- Functions -/
-
-/- Input `x → x₀` -/
-
-lemma myLim_pt_pt_def {X Y : Type*} [MetricSpace X] [MetricSpace Y]
-  {f : X → Y} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Y} :
-  myLim f D x₀ = y₀ ↔
-    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε := by
-  rw [myLim_pt_pt_def' hx₀, ← myTendsto_pt_pt_def]
-
-lemma myLim_pt_nr_def {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) {y₀ : Number} :
-  myLim f D x₀ = y₀ ↔
-    ∀ ε > 0, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → dist (f x) y₀ < ε := by
-  rw [myLim_pt_nr_def' hx₀, ← myTendsto_pt_nr_def]
-
-lemma myLim_pt_infty_def {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
-  myLim f D x₀ = ∞ ↔
-    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x > M := by
-  rw [myLim_pt_infty_def' hx₀, ← myTendsto_pt_infty_def]
-
-lemma myLim_pt_neginfty_def {X : Type*} [MetricSpace X]
-  {f : X → Number} {D : Set X} {x₀ : X} (hx₀ : x₀ ∈ AccPts D) :
-  myLim f D x₀ = (-∞ : EReal) ↔ -- TODO fix parsing of notation `-∞` as coercion to `EReal ??`
-    ∀ M, ∃ δ > 0, ∀ x ∈ D, (0 < dist x x₀ ∧ dist x x₀ < δ) → f x < M := by
-  rw [myLim_pt_neginfty_def' hx₀, ← myTendsto_pt_neginfty_def]
-
-/- Input `x → ∞` -/
-
-lemma myLim_infty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
-  {D : Set Number} (hD : ¬BddAbove D) {y₀ : Y} :
-  myLim f D ∞ = y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε := by
-  rw [myLim_infty_pt_def' hD, ← myTendsto_infty_pt_def]
-
-lemma myLim_infty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) {y₀ : Number} :
-  myLim f D ∞ = y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x > z → dist (f x) y₀ < ε := by
-  rw [myLim_infty_nr_def' hD, ← myTendsto_infty_pt_def]
-  rfl
-
-lemma myLim_infty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D ∞ = ∞ ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M := by
-  rw [myLim_infty_infty_def' hD, ← myTendsto_infty_infty_def]
-
-lemma myLim_infty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D ∞ = (-∞ : EReal) ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M := by
-  rw [myLim_infty_neginfty_def' hD, ← myTendsto_infty_neginfty_def]
-
-/- input `x → -∞`-/
-
-lemma myLim_neginfty_pt_def {Y : Type*} [MetricSpace Y] {f : Number → Y}
-  {D : Set Number} (hD : ¬BddBelow D) {y₀ : Y} :
-  myLim f D (-∞) = y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε := by
-  rw [myLim_neginfty_pt_def' hD, ← myTendsto_neginfty_pt_def]
-
-lemma myLim_neginfty_nr_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D)
-  {y₀ : Number} : myLim f D (-∞) = y₀ ↔
-    ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε := by
-  rw [myLim_neginfty_nr_def' hD, ← myTendsto_neginfty_pt_def]
-  rfl
-
-lemma myLim_neginfty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D (-∞) = ∞ ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M := by
-  rw [myLim_neginfty_infty_def' hD, ← myTendsto_neginfty_infty_def]
-
-lemma myLim_neginfty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D (-∞) = (-∞ : EReal) ↔
-    ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M := by
-  rw [myLim_neginfty_neginfty_def' hD, ← myTendsto_neginfty_neginfty_def]
-
-
-/- Limits of equences -/
-
-lemma lim_seq_pt_def {X : Type*} [MetricSpace X] {a : Number → X} {p : X} :
-  lim_seq a = p ↔
-    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
-  rw [lim_seq_pt_def', ← tendsto_seq_pt_def]
-
-lemma lim_seq_nr_def {a : Number → Number} {p : Number} :
-  lim_seq a = p ↔
-    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε := by
-  rw [lim_seq_nr_def', ← tendsto_seq_nr_def]
+lemma lim_seq_pt_def {β : Type*} [MetricSpace β] [Nontrivial β]
+  [PartialOrder β] [NoTopOrder β] [NoBotOrder β]
+  [ClosedIciTopology β] [ClosedIicTopology β]
+  {a : Number → β} {p : β} :
+  lim_seq a = p  ↔
+    ∀ ε > 0, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → dist (a n) p < ε :=
+  by
+  rw [← myTendsto_seq_pt_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_infty_iff_notBddAbove.mpr notBddAbove_natNumber
 
 lemma lim_seq_infty_def {a : Number → Number} :
-  lim_seq a = ∞ ↔
-    ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n > M := by
-  rw [lim_seq_infty_def', ← tendsto_seq_infty_def]
+  lim_seq a = MaybeUndefined.of_def ∞  ↔  ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n > M :=
+  by
+  rw [← myTendsto_seq_infty_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_infty_iff_notBddAbove.mpr notBddAbove_natNumber
 
 lemma lim_seq_neginfty_def {a : Number → Number} :
-  lim_seq a = (-∞ : EReal) ↔
-    ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M := by
-  rw [lim_seq_neginfty_def', ← tendsto_seq_neginfty_def]
+  lim_seq a = MaybeUndefined.of_def -∞  ↔  ∀ M, ∃ N ∈ NatNumber, ∀ n ∈ NatNumber, n ≥ N → a n < M :=
+  by
+  rw [← myTendsto_seq_neginfty_def]
+  apply myLim_iff_myTendsto
+  exact neBot_inputFilter_infty_iff_notBddAbove.mpr notBddAbove_natNumber
+
+end Characterizations
 
 
-#check Option.map₂
+section Impossible
 
+/- Trivial input filter implies all points satisfy convergence condition ... -/
+
+lemma myTendsto_bot_inputFilter {α β : Type*} [TopologicalSpace α] [Preorder α]
+  [TopologicalSpace β] [Preorder β]
+  {f : α → β} {D : Set α} {x₀ : WithBot (WithTop α)} (hIn : input_filter D x₀ = ⊥) :
+  ∀ {y₀ : WithBot (WithTop β)}, myTendsto f D x₀ y₀ :=
+  by
+  intro y₀
+  unfold myTendsto
+  rw [hIn]
+  apply Filter.tendsto_bot
+
+/- ... and hence that the limit is ill-defined :) -/
+
+lemma myLim_bot_inputFilter {α β : Type*} [TopologicalSpace α] [Preorder α]
+  [TopologicalSpace β] [Preorder β]
+  {f : α → β} {D : Set α} {x₀ : WithBot (WithTop α)} (hIn : input_filter D x₀ = ⊥)
+  {y₀ : WithBot (WithTop β)} : myLim f D x₀ ≠ y₀ :=
+  by
+  apply MaybeUndefined.neq_defined_of_all_satisfied
+  apply myTendsto_bot_inputFilter
+  exact hIn
+
+/- Trivial output filter requires input filter to be trivial for convergence -/
+
+lemma myTendsto_iff_bot_inputFilter_of_bot_outputFilter {α β : Type*}
+  [TopologicalSpace α] [Preorder α] [TopologicalSpace β] [Preorder β]
+  {f : α → β} {D : Set α} {x₀ : WithBot (WithTop α)} {y₀ : WithBot (WithTop β)}
+  (hOut : output_filter y₀ = ⊥) : myTendsto f D x₀ y₀  ↔  (input_filter D x₀ = ⊥) :=
+  by
+  constructor <;> intro h; swap
+  · apply myTendsto_bot_inputFilter h
+  contrapose hOut
+  rw [← ne_eq, ← Filter.neBot_iff]
+  rw [← ne_eq, ← Filter.neBot_iff] at hOut
+  apply @Filter.Tendsto.neBot _ _ _ _ _ h
+
+/- ... hence the limit is then ill-defined -/
+
+lemma myLim_bot_outputFilter {α β : Type*}
+  [TopologicalSpace α] [Preorder α] [TopologicalSpace β] [Preorder β] [Nontrivial β]
+  {f : α → β} {D : Set α} {x₀ : WithBot (WithTop α)} {y₀ : WithBot (WithTop β)}
+  (hOut : output_filter y₀ = ⊥) : myLim f D x₀ ≠ y₀ :=
+  by
+  -- already seen that trivial input filter results in ill-defined limit
+  wlog h : input_filter D x₀ ≠ ⊥
+  · rw [not_not] at h
+    apply myLim_bot_inputFilter h
+  -- use previous lemma
+  contrapose h
+  rw [← myTendsto_iff_bot_inputFilter_of_bot_outputFilter hOut]
+  apply MaybeUndefined.satisfies_of_eq_defined h
+
+/- Limits to `∞` and `-∞` (both input and output) are ill-defined for metric spaces without
+ an inherent preorder, i.e., those that get assigned the `discreteOrder`.  -/
+
+/- Set up -/
+
+lemma bot_atTop_discreteOrder {γ : Type*} [MetricSpace γ] [Nontrivial γ] :
+  (atTop : Filter γ) = ⊥ := by
+  rw [← Filter.empty_mem_iff_bot]
+  have : ∃ a b : γ, a ≠ b := by rwa [← nontrivial_iff]
+  obtain ⟨a, b, aneqb⟩ := this
+  have : ∅ = {x | x ≥ a} ∩ {x | x ≥ b} := by
+    ext x
+    simp only [Set.mem_empty_iff_false, ge_iff_le, Set.mem_inter_iff, Set.mem_setOf_eq, false_iff,
+      not_and]
+    simp only [LE.le]
+    intro h1 h2
+    exact aneqb (h1.trans h2.symm)
+  rw [this]
+  apply Filter.inter_mem <;> apply Filter.mem_atTop
+
+lemma bot_atBot_discreteOrder {γ : Type*} [MetricSpace γ] [Nontrivial γ] :
+  (atBot : Filter γ) = ⊥ := by
+  rw [← Filter.empty_mem_iff_bot]
+  have : ∃ a b : γ, a ≠ b := by rwa [← nontrivial_iff]
+  obtain ⟨a, b, aneqb⟩ := this
+  have : ∅ = {x | x ≤ a} ∩ {x | x ≤ b} := by
+    ext x
+    simp only [Set.mem_empty_iff_false, Set.mem_inter_iff, Set.mem_setOf_eq, false_iff, not_and]
+    simp only [LE.le]
+    intro h1 h2
+    exact aneqb (h1.symm.trans h2)
+  rw [this]
+  apply Filter.inter_mem <;> apply Filter.mem_atBot
+
+lemma bot_inputFilter_infty_discreteOrder {α : Type*} [MetricSpace α] [Nontrivial α] {D : Set α} :
+  (input_filter D ∞ : Filter α) = ⊥ := by
+  simp only [input_filter]
+  rw [inf_principal_eq_bot]
+  rw [bot_atTop_discreteOrder]
+  apply Filter.mem_bot
+
+lemma bot_inputFilter_neginfty_discreteOrder {α : Type*} [MetricSpace α] [Nontrivial α] {D : Set α} :
+  (input_filter D -∞ : Filter α) = ⊥ := by
+  simp only [input_filter]
+  rw [inf_principal_eq_bot]
+  rw [bot_atBot_discreteOrder]
+  apply Filter.mem_bot
+
+lemma bot_outputFilter_infty_discreteOrder {β : Type*} [MetricSpace β] [Nontrivial β] :
+  (output_filter ∞ : Filter β) = ⊥ := by
+  simp only [output_filter]
+  rw [bot_atTop_discreteOrder]
+
+lemma bot_outputFilter_neginfty_discreteOrder {β : Type*} [MetricSpace β] [Nontrivial β] :
+  (output_filter -∞ : Filter β) = ⊥ := by
+  simp only [output_filter]
+  rw [bot_atBot_discreteOrder]
+
+/- Concrete results -/
+
+lemma myLim_neq_input_infty_metricSpace {α β : Type*} [MetricSpace α] [Nontrivial α]
+  [TopologicalSpace β] [Preorder β]
+  {f : α → β} {D : Set α} {y₀ : WithBot (WithTop β)} : myLim f D ∞ ≠ (MaybeUndefined.of_def y₀) :=
+  by
+  apply myLim_bot_inputFilter
+  apply bot_inputFilter_infty_discreteOrder
+
+lemma myLim_neq_input_neginfty_metricSpace {α β : Type*} [MetricSpace α] [Nontrivial α]
+  [TopologicalSpace β] [Preorder β]
+  {f : α → β} {D : Set α} {y₀ : WithBot (WithTop β)} : myLim f D -∞ ≠ (MaybeUndefined.of_def y₀) :=
+  by
+  apply myLim_bot_inputFilter
+  apply bot_inputFilter_neginfty_discreteOrder
+
+lemma myLim_neq_output_infty_metricSpace {α β : Type*} [TopologicalSpace α] [Preorder α]
+  [MetricSpace β] [Nontrivial β]
+  {f : α → β} {D : Set α} {x₀ : WithBot (WithTop α)} : myLim f D x₀ ≠ (MaybeUndefined.of_def ∞) :=
+  by
+  apply myLim_bot_outputFilter
+  apply bot_outputFilter_infty_discreteOrder
+
+lemma myLim_neq_output_neginfty_metricSpace {α β : Type*} [TopologicalSpace α] [Preorder α]
+  [MetricSpace β] [Nontrivial β]
+  {f : α → β} {D : Set α} {x₀ : WithBot (WithTop α)} : myLim f D x₀ ≠ (MaybeUndefined.of_def -∞) :=
+  by
+  apply myLim_bot_outputFilter
+  apply bot_outputFilter_neginfty_discreteOrder
+
+/- and for sequences -/
+
+lemma limseq_neq_infty_metricSpace {β : Type*} [MetricSpace β] [Nontrivial β]
+  {a : Number → β} : lim_seq a ≠ MaybeUndefined.of_def ∞ := by
+  apply myLim_neq_output_infty_metricSpace
+
+
+lemma limseq_neq_neginfty_metricSpace {β : Type*} [MetricSpace β] [Nontrivial β]
+  {a : Number → β} : lim_seq a ≠ MaybeUndefined.of_def -∞ := by
+  apply myLim_neq_output_neginfty_metricSpace
+
+end Impossible
+
+
+section Laws
+
+-- WIP
+
+end Laws
 
 
 end Limit
