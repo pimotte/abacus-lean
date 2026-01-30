@@ -17,7 +17,7 @@ theorem ext {α : Type*} {P Q : MaybeUndefined α} (h : ∀ x : α, P x ↔ Q x)
 def mk {α : Type*} (P : α → Prop) : MaybeUndefined α := P
 def of_def {α : Type*} (x : α) : MaybeUndefined α := Set.singleton x
 
-instance {α : Type*} : Coe α (MaybeUndefined α) where
+instance {α : Type*} : CoeTail α (MaybeUndefined α) where
   coe := of_def
 
 
@@ -65,8 +65,8 @@ end MaybeUndefined
 
 
 
--- -- /- Establish inherited arithmetic operations -/
--- -- section MaybeUndefined.Operations
+/- Inherited operations -/
+section MaybeUndefined.Operations
 
 -- -- @[to_additive]
 -- -- protected def MaybeUndefined.one {α : Type*} [One α] : One (MaybeUndefined α) :=
@@ -80,23 +80,23 @@ end MaybeUndefined
 
 -- attribute [instance] MaybeUndefined.top MaybeUndefined.bot
 
--- @[to_additive]
--- protected def MaybeUndefined.mul {α : Type*} [Mul α] : Mul (MaybeUndefined α) :=
---   ⟨Set.image2 Mul.mul⟩
+@[to_additive]
+protected def MaybeUndefined.mul {α : Type*} [Mul α] : Mul (MaybeUndefined α) :=
+  ⟨Set.image2 Mul.mul⟩
 
--- attribute [instance] MaybeUndefined.mul MaybeUndefined.add
+attribute [instance] MaybeUndefined.mul MaybeUndefined.add
 
--- @[to_additive]
--- protected def MaybeUndefined.inv {α : Type*} [Inv α] : Inv (MaybeUndefined α) :=
---   ⟨Set.image Inv.inv⟩
+@[to_additive]
+protected def MaybeUndefined.inv {α : Type*} [Inv α] : Inv (MaybeUndefined α) :=
+  ⟨Set.image Inv.inv⟩
 
--- attribute [instance] MaybeUndefined.inv MaybeUndefined.neg
+attribute [instance] MaybeUndefined.inv MaybeUndefined.neg
 
--- @[to_additive]
--- protected def MaybeUndefined.div {α : Type*} [Div α] : Div (MaybeUndefined α) :=
---   ⟨Set.image2 Div.div⟩
+@[to_additive]
+protected def MaybeUndefined.div {α : Type*} [Div α] : Div (MaybeUndefined α) :=
+  ⟨Set.image2 Div.div⟩
 
--- attribute [instance] MaybeUndefined.div MaybeUndefined.sub
+attribute [instance] MaybeUndefined.div MaybeUndefined.sub
 
 -- -- TODO add instance (?) that these indeed satisfy the required properties for these rules
 -- -- i.e. that `of_defined '' α` has the same structure as `α`

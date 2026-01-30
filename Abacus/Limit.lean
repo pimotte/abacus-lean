@@ -3,6 +3,7 @@ import Mathlib.Topology.Instances.Real.Lemmas
 
 import Abacus.Number
 import Abacus.MaybeUndefined
+import Abacus.WithBotTopStructure
 
 
 section DiscreteOrder   -- TODO: turn into module?
@@ -658,5 +659,41 @@ section Laws
 
 end Laws
 
+
+section Example
+
+-- theorem lim_seq_divn_zero : lim_seq (fun n ↦ 1/n) = 0 := by sorry
+theorem lim_seq_divn_zero : lim_seq (fun n ↦ 1/n) = MaybeUndefined.of_def 0 := by sorry
+
+
+lemma computation₁ : lim_seq (fun n ↦ 1 + 1/n) = MaybeUndefined.of_def 1 := by
+  calc
+    lim_seq (fun n ↦ 1 + 1/n)
+      = lim_seq (fun n ↦ 1) + lim_seq (fun n ↦ 1/n) := by sorry
+    _ = 1 + lim_seq (fun n ↦ 1/n) := by sorry
+    _ = 1 + 0 := by rw [lim_seq_divn_zero]
+    _ = 1 := by sorry
+
+lemma corollary₁ : myTendsto (fun n ↦ 1 + 1/n) NatNumber ∞ 1 :=
+  MaybeUndefined.satisfies_of_eq_defined computation₁
+
+
+-- #synth Add (MaybeUndefined (WithBot (WithTop ℝ)))
+-- #check WithBotTop.add_conservative
+
+
+
+-- lemma computation₂ : lim_seq (fun n ↦ 2 + 1/n) = MaybeUndefined.of_def (1 + 1) := by
+--   calc
+--     lim_seq (fun n ↦ 2 + 1/n)
+--       = lim_seq (fun n ↦ 2) + lim_seq (fun n ↦ 1/n) := by sorry
+--     _ = 2 + lim_seq (fun n ↦ 1/n) := by sorry
+--     _ = 2 + 0 := by rw [lim_seq_divn_zero]
+--     _ = 1 + 1 := by sorry
+
+-- lemma corollary₂ : myTendsto (fun n ↦ 2 + 1/n) NatNumber ∞ (1 + 1) :=
+--   MaybeUndefined.satisfies_of_eq_defined computation₂
+
+end Example
 
 end Limit
