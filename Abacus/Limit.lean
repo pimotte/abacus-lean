@@ -3,6 +3,7 @@ import Mathlib.Topology.Instances.Real.Lemmas
 
 import Abacus.Number
 import Abacus.MaybeUndefined
+import Abacus.WithBotTopStructure
 
 
 section DiscreteOrder   -- TODO: turn into module?
@@ -70,12 +71,12 @@ def myTendsto {α β : Type*} [TopologicalSpace α] [Preorder α] [TopologicalSp
   (f : α → β) (D : Set α) (x₀ : WithBot (WithTop α)) (y₀ : WithBot (WithTop β)) : Prop :=
   Filter.Tendsto f (input_filter D x₀) (output_filter y₀)
 
-def myLim {α β : Type*} [TopologicalSpace α] [Preorder α] [TopologicalSpace β] [Preorder β]
+noncomputable def myLim {α β : Type*} [TopologicalSpace α] [Preorder α] [TopologicalSpace β] [Preorder β]
   (f : α → β) (D : Set α) (x₀ : WithBot (WithTop α)) : MaybeUndefined (WithBot (WithTop β)) :=
-  MaybeUndefined.mk (myTendsto f D x₀)
+  MaybeUndefined.unique_satisfier (myTendsto f D x₀)
 
-def lim_seq {β : Type*} [TopologicalSpace β] [Preorder β] (seq : Number → β) :
-  MaybeUndefined (WithBot (WithTop β)) := MaybeUndefined.mk (myTendsto seq NatNumber ∞)
+noncomputable def lim_seq {β : Type*} [TopologicalSpace β] [Preorder β] (seq : Number → β) :
+  MaybeUndefined (WithBot (WithTop β)) := MaybeUndefined.unique_satisfier (myTendsto seq NatNumber ∞)
 
 
 /- Test limit inputs -/
@@ -655,7 +656,7 @@ lemma bot_outputFilter_neginfty_discreteOrder {β : Type*} [MetricSpace β] [Non
 
 lemma myLim_neq_input_infty_metricSpace {α β : Type*} [MetricSpace α] [Nontrivial α]
   [TopologicalSpace β] [Preorder β]
-  {f : α → β} {D : Set α} {y₀ : WithBot (WithTop β)} : myLim f D ∞ ≠ (MaybeUndefined.of_def y₀) :=
+  {f : α → β} {D : Set α} {y₀ : WithBot (WithTop β)} : myLim f D ∞ ≠ (y₀) :=
   by
   apply myLim_bot_inputFilter
   apply bot_inputFilter_infty_discreteOrder
@@ -705,5 +706,43 @@ section Laws
 
 end Laws
 
+
+section Example
+
+-- theorem lim_seq_divn_zero : lim_seq (fun n ↦ 1/n) = 0 := by sorry
+theorem lim_seq_divn_zero : lim_seq (fun n ↦ 1/n) = MaybeUndefined.of_def 0 := by sorry
+
+open WithBotTop
+#check MaybeUndefined.of_def (∞ : [-∞,∞]) + MaybeUndefined.of_def (∞ : [-∞,∞])
+
+lemma computation₁ : lim_seq (fun n ↦ 1 + 1/n) = MaybeUndefined.of_def 1 := by
+  calc
+    lim_seq (fun n ↦ 1 + 1/n)
+      = lim_seq (fun n ↦ 1) + lim_seq (fun n ↦ 1/n) := by sorry
+    _ = 1 + lim_seq (fun n ↦ 1/n) := by sorry
+    _ = 1 + 0 := by rw [lim_seq_divn_zero]
+    _ = 1 := by sorry
+
+lemma corollary₁ : myTendsto (fun n ↦ 1 + 1/n) NatNumber ∞ 1 :=
+  MaybeUndefined.satisfies_of_eq_defined computation₁
+
+
+-- #synth Add (MaybeUndefined (WithBot (WithTop ℝ)))
+-- #check WithBotTop.add_conservative
+
+
+
+-- lemma computation₂ : lim_seq (fun n ↦ 2 + 1/n) = MaybeUndefined.of_def (1 + 1) := by
+--   calc
+--     lim_seq (fun n ↦ 2 + 1/n)
+--       = lim_seq (fun n ↦ 2) + lim_seq (fun n ↦ 1/n) := by sorry
+--     _ = 2 + lim_seq (fun n ↦ 1/n) := by sorry
+--     _ = 2 + 0 := by rw [lim_seq_divn_zero]
+--     _ = 1 + 1 := by sorry
+
+-- lemma corollary₂ : myTendsto (fun n ↦ 2 + 1/n) NatNumber ∞ (1 + 1) :=
+--   MaybeUndefined.satisfies_of_eq_defined computation₂
+
+end Example
 
 end Limit

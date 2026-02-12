@@ -1,6 +1,5 @@
 import Mathlib.Data.Real.Basic
-import Mathlib.Data.EReal.Basic
-import Mathlib.Data.EReal.Operations
+
 
 notation "Number" => Real
 def RealNumber : Set Number := {x | ∃ r : Real, x = r}
