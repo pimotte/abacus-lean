@@ -1,18 +1,19 @@
 import Mathlib.Order.WithBot
 import Abacus.MaybeUndefined
-
-def extend_conservative {α β : Type*} (f : α → β) (U : MaybeUndefined (WithBot (WithTop α))) :
-  MaybeUndefined (WithBot (WithTop β)) := Set.image (some ∘ some ∘ f) (Set.preimage (some ∘ some) U)
-  -- remove all potential occurences of `⊥` and `⊤` in subset of `WithBotTop α`
-  -- before mapping to `WithBotTop β` via `f`
-  -- In effect, make effect of `f` on `⊥` and `⊤` undefined (empty set).
-
-def extend_conservative2 {α β γ : Type*} (f : α → β → γ) (U : MaybeUndefined (WithBot (WithTop α)))
-  (V : MaybeUndefined (WithBot (WithTop β))) : MaybeUndefined (WithBot (WithTop γ)) :=
-  Set.image2 (fun (x : α) (y : β) ↦ some (some (f x y)))
-    (Set.preimage (some ∘ some) U) (Set.preimage (some ∘ some) V)
+import Mathlib.Data.Real.Basic -- needed for correct functioning `to_additive`
 
 
+/- Make effect of `f` on `⊥` and `⊤` undefined. -/
+def extend_conservative {α β : Type*} (f : α → β) :
+  MaybeUndefined (WithBot (WithTop α)) → MaybeUndefined (WithBot (WithTop β))
+  | some (some (some x)) => some (some (some (f x)))
+  | _ => none
+
+/- Make effect of `f` on `⊥` and `⊤` undefined. -/
+def extend_conservative2 {α β γ : Type*} (f : α → β → γ) : MaybeUndefined (WithBot (WithTop α)) →
+  MaybeUndefined (WithBot (WithTop β)) → MaybeUndefined (WithBot (WithTop γ))
+  | some (some (some x)), some (some (some y)) => some (some (some (f x y)))
+  | _, _ => none
 
 @[to_additive]
 protected def WithBotTop.mul_conservative {α : Type*} [Mul α] :

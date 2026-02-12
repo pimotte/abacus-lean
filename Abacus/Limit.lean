@@ -71,12 +71,12 @@ def myTendsto {α β : Type*} [TopologicalSpace α] [Preorder α] [TopologicalSp
   (f : α → β) (D : Set α) (x₀ : WithBot (WithTop α)) (y₀ : WithBot (WithTop β)) : Prop :=
   Filter.Tendsto f (input_filter D x₀) (output_filter y₀)
 
-def myLim {α β : Type*} [TopologicalSpace α] [Preorder α] [TopologicalSpace β] [Preorder β]
+noncomputable def myLim {α β : Type*} [TopologicalSpace α] [Preorder α] [TopologicalSpace β] [Preorder β]
   (f : α → β) (D : Set α) (x₀ : WithBot (WithTop α)) : MaybeUndefined (WithBot (WithTop β)) :=
-  MaybeUndefined.mk (myTendsto f D x₀)
+  MaybeUndefined.unique_satisfier (myTendsto f D x₀)
 
-def lim_seq {β : Type*} [TopologicalSpace β] [Preorder β] (seq : Number → β) :
-  MaybeUndefined (WithBot (WithTop β)) := MaybeUndefined.mk (myTendsto seq NatNumber ∞)
+noncomputable def lim_seq {β : Type*} [TopologicalSpace β] [Preorder β] (seq : Number → β) :
+  MaybeUndefined (WithBot (WithTop β)) := MaybeUndefined.unique_satisfier (myTendsto seq NatNumber ∞)
 
 
 /- Test limit inputs -/
@@ -609,7 +609,7 @@ lemma bot_outputFilter_neginfty_discreteOrder {β : Type*} [MetricSpace β] [Non
 
 lemma myLim_neq_input_infty_metricSpace {α β : Type*} [MetricSpace α] [Nontrivial α]
   [TopologicalSpace β] [Preorder β]
-  {f : α → β} {D : Set α} {y₀ : WithBot (WithTop β)} : myLim f D ∞ ≠ (MaybeUndefined.of_def y₀) :=
+  {f : α → β} {D : Set α} {y₀ : WithBot (WithTop β)} : myLim f D ∞ ≠ (y₀) :=
   by
   apply myLim_bot_inputFilter
   apply bot_inputFilter_infty_discreteOrder
@@ -665,6 +665,8 @@ section Example
 -- theorem lim_seq_divn_zero : lim_seq (fun n ↦ 1/n) = 0 := by sorry
 theorem lim_seq_divn_zero : lim_seq (fun n ↦ 1/n) = MaybeUndefined.of_def 0 := by sorry
 
+open WithBotTop
+#check MaybeUndefined.of_def (∞ : [-∞,∞]) + MaybeUndefined.of_def (∞ : [-∞,∞])
 
 lemma computation₁ : lim_seq (fun n ↦ 1 + 1/n) = MaybeUndefined.of_def 1 := by
   calc
