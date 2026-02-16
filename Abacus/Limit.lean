@@ -362,17 +362,32 @@ lemma myTendsto_neginfty_pt_def {β : Type*} [MetricSpace β] [Preorder β]
     grind
 
 lemma myTendsto_neginfty_infty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D -∞ ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M :=
+  myTendsto f D -∞ ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x ≤ z → f x ≥ M :=
   by
   unfold myTendsto input_filter output_filter
-  simp only [gt_iff_lt]
-  
-  sorry
+  rw [(atBot_basis.inf_principal _).tendsto_iff atTop_basis]
+  simp only [Set.mem_inter_iff, Set.mem_Iic, Set.mem_Ici, and_imp, true_and, forall_const]
+  refine forall_congr' fun M ↦ ⟨fun h ↦ ?_, fun h ↦ ?_⟩
+  · obtain ⟨x, hx⟩ := h
+    use x
+    grind
+  · obtain ⟨x, hx⟩ := h
+    use x
+    grind
 
 lemma myTendsto_neginfty_neginfty_def {f : Number → Number} {D : Set Number} :
-  myTendsto f D -∞ -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M :=
+  myTendsto f D -∞ -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x ≤ z → f x ≤ M :=
   by
-  sorry
+  unfold myTendsto input_filter output_filter
+  rw [(atBot_basis.inf_principal _).tendsto_iff atBot_basis]
+  simp only [Set.mem_inter_iff, Set.mem_Iic, and_imp, true_and, forall_const]
+  refine forall_congr' fun M ↦ ⟨fun h ↦ ?_, fun h ↦ ?_⟩
+  · obtain ⟨x, hx⟩ := h
+    use x
+    grind
+  · obtain ⟨x, hx⟩ := h
+    use x
+    grind
 
 /- Characterization of `myTendsto` for sequences into familiar terms -/
 
@@ -464,14 +479,14 @@ lemma myLim_infty_pt_def {β : Type*} [MetricSpace β] [Nontrivial β]
   exact neBot_inputFilter_infty_iff_notBddAbove.mpr hD
 
 lemma myLim_infty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D ∞ = MaybeUndefined.of_def ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x > z → f x > M :=
+  myLim f D ∞ = MaybeUndefined.of_def ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x ≥ z → f x ≥ M :=
   by
   rw [← myTendsto_infty_infty_def]
   apply myLim_iff_myTendsto
   exact neBot_inputFilter_infty_iff_notBddAbove.mpr hD
 
 lemma myLim_infty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddAbove D) :
-  myLim f D ∞ = MaybeUndefined.of_def -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x > z → f x < M :=
+  myLim f D ∞ = MaybeUndefined.of_def -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x ≥ z → f x ≤ M :=
   by
   rw [← myTendsto_infty_neginfty_def]
   apply myLim_iff_myTendsto
@@ -483,21 +498,21 @@ lemma myLim_neginfty_pt_def {β : Type*} [MetricSpace β] [Nontrivial β]
   [PartialOrder β] [NoTopOrder β] [NoBotOrder β]
   [ClosedIciTopology β] [ClosedIicTopology β]
   {f : Number → β} {D : Set Number} (hD : ¬BddBelow D) {y₀ : β} :
-  myLim f D -∞ = y₀  ↔  ∀ ε > 0, ∃ z, ∀ x ∈ D, x < z → dist (f x) y₀ < ε :=
+  myLim f D -∞ = y₀  ↔  ∀ ε > 0, ∃ z, ∀ x ∈ D, x ≤ z → dist (f x) y₀ < ε :=
   by
   rw [← myTendsto_neginfty_pt_def]
   apply myLim_iff_myTendsto
   exact neBot_inputFilter_neginfty_iff_notBddBelow.mpr hD
 
 lemma myLim_neginfty_infty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D -∞ = MaybeUndefined.of_def ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x < z → f x > M :=
+  myLim f D -∞ = MaybeUndefined.of_def ∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x ≤ z → f x ≥ M :=
   by
   rw [← myTendsto_neginfty_infty_def]
   apply myLim_iff_myTendsto
   exact neBot_inputFilter_neginfty_iff_notBddBelow.mpr hD
 
 lemma myLim_neginfty_neginfty_def {f : Number → Number} {D : Set Number} (hD : ¬BddBelow D) :
-  myLim f D -∞ = MaybeUndefined.of_def -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x < z → f x < M :=
+  myLim f D -∞ = MaybeUndefined.of_def -∞  ↔  ∀ M, ∃ z, ∀ x ∈ D, x ≤ z → f x ≤ M :=
   by
   rw [← myTendsto_neginfty_neginfty_def]
   apply myLim_iff_myTendsto
