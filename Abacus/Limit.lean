@@ -663,39 +663,6 @@ end Laws
 section Example
 
 
-
-open WithBotTop
-#check MaybeUndefined.of_def (∞ : [-∞,∞]) + MaybeUndefined.of_def (∞ : [-∞,∞])
-
-
-instance : Top (MaybeUndefined [-∞,∞]) where
-  top := MaybeUndefined.of_def (⊤ : [-∞,∞])
-instance : Bot (MaybeUndefined [-∞,∞]) where
-  bot := MaybeUndefined.of_def (⊥ : [-∞,∞])
-
-instance {n : Nat} : OfNat (MaybeUndefined [-∞,∞]) n where
-  ofNat := MaybeUndefined.of_def (some (some (Real.instNatCast.natCast n)))
-
-@[default_instance 501]
-instance : OfScientific (MaybeUndefined [-∞,∞]) where
-  ofScientific := by
-    have f : OfScientific Number := by infer_instance
-    exact (fun mantissa exponent decExponent ↦
-      MaybeUndefined.of_def (f.ofScientific mantissa exponent decExponent))
-
--- by infer_instance
-
-#check (∞ : [-∞,∞])
-#check (∞ : MaybeUndefined [-∞,∞])
-#check (1 : MaybeUndefined [-∞,∞])
-
-example : MaybeUndefined.of_def (2 : [-∞,∞]) = 2 := by
-  rfl
-
-example : MaybeUndefined.of_def (0 : [-∞,∞]) = 0 := by
-  rw [← Nat.cast_zero]
-  rfl
-
 -- theorem lim_seq_divn_zero : lim_seq (fun n ↦ 1/n) = 0 := by sorry
 theorem lim_seq_divn_zero : lim_seq (fun n ↦ 1/n) = 0 := by sorry
 
@@ -707,19 +674,18 @@ lemma computation₁ : lim_seq (fun n ↦ 1 + 1/n) = 1 := by
     _ = 1 + 0 := by rw [lim_seq_divn_zero]
     _ = 1 := by
       calc
-        (1 : MaybeUndefined [-∞,∞]) + 0 = MaybeUndefined.of_def 1 + MaybeUndefined.of_def 0 := by
-              rw [← Nat.cast_one, ← Nat.cast_zero]; rfl
-        _ = MaybeUndefined.of_def (1 + 0) := by
-              rfl
+        (1 : MaybeUndefined [-∞,∞]) + 0
+        _ = MaybeUndefined.of_def 1 + MaybeUndefined.of_def 0 := by rfl
+        _ = MaybeUndefined.of_def (1 + 0) := by rfl
         _ = MaybeUndefined.of_def 1 := by norm_num
-        _ = 1 := by rw [← Nat.cast_one]; rfl
+        _ = 1 := by rfl
 
         -- norm_cast, norm_fun (push coercions etc.)
 
 example : lim_seq (fun n ↦ (2 - 1)/n) = 0 := by
   calc
     lim_seq (fun n ↦ (2 - 1)/n)
-      = lim_seq (fun n ↦ 1/n) := by norm_num
+    _ = lim_seq (fun n ↦ 1/n) := by norm_num
     _ = 0 := by rw [lim_seq_divn_zero]
 
 
@@ -732,10 +698,6 @@ example {a : Number → Number} (ha : ∀ n, a n = 1/n) : lim_seq (fun n ↦ a n
 
 lemma corollary₁ : myTendsto (fun n ↦ 1 + 1/n) NatNumber ∞ 1 :=
   MaybeUndefined.satisfies_of_eq_defined computation₁
-
-
--- #synth Add (MaybeUndefined (WithBot (WithTop ℝ)))
--- #check WithBotTop.add_conservative
 
 
 

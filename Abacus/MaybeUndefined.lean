@@ -3,6 +3,7 @@ import Mathlib.Data.Option.Basic
 -- import Mathlib.Data.Set.Basic
 import Mathlib.Tactic.ToAdditive
 import Mathlib.Tactic.WLOG
+import Mathlib.Order.TypeTags
 
 def MaybeUndefined (α : Type*) := Option α
 
@@ -85,9 +86,9 @@ end MaybeUndefined
 
 -- -- attribute [instance] MaybeUndefined.one MaybeUndefined.zero
 
--- @[to_dual]
--- protected def MaybeUndefined.top {α : Type*} [Top α] : Top (MaybeUndefined α) :=
---   ⟨of_def Top.top⟩
+@[to_dual]
+instance MaybeUndefined.top {α : Type*} [Top α] : Top (MaybeUndefined α) :=
+  ⟨of_def Top.top⟩
 
 -- attribute [instance] MaybeUndefined.top MaybeUndefined.bot
 
